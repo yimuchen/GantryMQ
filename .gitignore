@@ -1,0 +1,8 @@
+# Build related files
+build/
+CMakeFiles/
+CMake*
+Makefile
+*.cmake
+src/gmqclient/version.py
+!CMakeLists.txt
