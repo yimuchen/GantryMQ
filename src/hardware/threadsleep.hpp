@@ -4,6 +4,9 @@
  * @brief Inline functions to help sleep threads
  * @date 2023-08-03
  */
+#ifndef GANTRYMQ_THREADSLEEP_HPP
+#define GANTRYMQ_THREADSLEEP_HPP
+
 #include <chrono>
 #include <thread>
 
@@ -39,3 +42,5 @@ sleep_seconds( const unsigned x )
 }
 
 }
+
+#endif

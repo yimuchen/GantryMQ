@@ -25,7 +25,7 @@
  * [s-port]: https://www.xanthium.in/Serial-Port-Programming-on-Linux
  * [marlin]: https://marlinfw.org/meta/gcode/
  */
-#include "logger.hpp"
+#include "sysfs.hpp"
 #include "threadsleep.hpp"
 
 // Standard C++ libraries
@@ -40,7 +40,7 @@
 // Pybind11
 #include <pybind11/pybind11.h>
 
-class GCoder
+class GCoder : private hw::fd_accessor
 {
 public:
   static const float _max_x;
@@ -75,23 +75,20 @@ public:
                   float z = std::nanf(""));
 
   // Floating point comparison.
-  static bool   MatchCoord( double x, double y );
-  static double ModifyTargetCoordinate( double orig, const double max );
+  static bool MatchCoord( double x, double y );
+  double      ModifyTargetCoordinate( double orig, const double max );
 
   // Helper methods
-  int         printer_IO;
-  float       opx, opy, opz; /** target position of the printer */
-  float       cx, cy, cz; /** current position of the printer */
-  float       vx, vy, vz; /** Speed of the gantry head. */
-  std::string dev_path;
+  float opx, opy, opz;           /** target position of the printer */
+  float cx, cy, cz;           /** current position of the printer */
+  float vx, vy, vz;           /** Speed of the gantry head. */
   // Constructor and destructor
-  GCoder();
+  GCoder( const std::string& dev_path );
+  GCoder()                 = delete;
   GCoder( const GCoder& )  = delete;
   GCoder( const GCoder&& ) = delete;
   ~GCoder();
 };
-
-static const std::string DeviceName = "GCoder";
 
 
 /**
@@ -128,37 +125,18 @@ static bool check_ack( const std::string& cmd, const std::string& msg );
  *
  * [s-port]: https://www.xanthium.in/Serial-Port-Programming-on-Linux
  */
-void
-GCoder::Init( const std::string& dev )
+GCoder::GCoder( const std::string& dev_path ) :  //
+  hw::fd_accessor( "GCoder", dev_path,
+                   O_RDWR | O_NOCTTY | O_NONBLOCK | O_ASYNC )
 {
   static const int speed = B115200;
 
   struct termios tty;
 
-  dev_path   = dev;
-  printer_IO = open( dev.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK | O_ASYNC );
-
-  if( printer_IO < 0 ){
-    throw device_exception( DeviceName,
-                            fmt::format(
-                              "Failed to open gcode device at path [%s]. returned code [%d]",
-                              dev,
-                              printer_IO ) );
-  }
-
-  int lock = flock( printer_IO, LOCK_EX | LOCK_NB );
-  if( lock ){
-    close( printer_IO );
-    printer_IO = -1;
-    throw device_exception( DeviceName,
-                            fmt::format( "Failed to lock path [%s]", dev ));
-  }
-
-  if( tcgetattr( printer_IO, &tty ) < 0 ){
-    throw device_exception( DeviceName,
-                            fmt::format(
-                              "Error getting termios settings. Returned code [%s]",
-                              strerror( errno ) ) );
+  if( tcgetattr( this->_fd, &tty ) < 0 ){
+    raise_error( fmt::format(
+                   "Error getting termios settings. Returned code [%s]",
+                   strerror( errno ) ) );
   }
 
   cfsetospeed( &tty, (speed_t)speed );
@@ -181,14 +159,12 @@ GCoder::Init( const std::string& dev )
   tty.c_cc[VMIN]  = 0;
   tty.c_cc[VTIME] = 0;
 
-  if( tcsetattr( printer_IO, TCSANOW, &tty ) != 0 ){
-    throw device_exception( DeviceName,
-                            fmt::format(
-                              "Error setting termios. Returned code [%s]",
+  if( tcsetattr( this->_fd, TCSANOW, &tty ) != 0 ){
+    raise_error( fmt::format( "Error setting termios. Returned code [%s]",
                               strerror( errno )) );
   }
 
-  printmsg( DeviceName, "Waking up printer...." );
+  printmsg( "Waking up printer...." );
   hw::sleep_seconds( 1 );
   SendHome( true, true, true );
   hw::sleep_milliseconds( 5 );
@@ -223,80 +199,55 @@ GCoder::Init( const std::string& dev )
 std::string
 GCoder::RunGcode( const std::string& gcode,
                   const unsigned     attempt,
-                  const unsigned     waitack ) const
+                  const unsigned     wait_ack ) const
 {
   using namespace std::chrono;
 
   // static variables
-  static const unsigned maxtry     = 10;
-  static const unsigned buffersize = 65536;
-
-  // Readout data
-  char        buffer[buffersize];
-  int         readlen;
-  std::string ackstr = "";
-  bool        awk    = false;
+  static const unsigned maxtry = 10;
 
   // Pretty output
   std::string pstring = gcode;
   pstring[pstring.length()-1] = '\0';// Getting rid of trailing new line
 
-  if( printer_IO < 0 ){
-    throw device_exception( DeviceName,
-                            "Printer is not available for commands" );
-  }
-
   if( attempt >= maxtry ){
-    throw device_exception( DeviceName,
-                            fmt::format(
-                              R"(ACK string for command [%s] was not received
-                              after [%d] attempts! The message could be dropped
-                              or there is something wrong with the printer!)",
-                              pstring,
-                              maxtry ) );
+    raise_error(
+      fmt::format(
+        R"(ACK string for command [%s] was not received after [%d] attempts!
+        The message could be dropped or there is something wrong with the device!)",
+        pstring,
+        maxtry ) );
   }
 
   // Sending output
-  printdebug( DeviceName,
-              fmt::format( "[%s] to USBTERM[%d] (attempt %u)",
+  printdebug( fmt::format( "[%s] to USBTERM[%d] (attempt %u)",
                            pstring,
-                           dev_path,
+                           this->_dev_path,
                            attempt ));
-  write( printer_IO, gcode.c_str(), gcode.length() );
-  tcdrain( printer_IO );
+  this->write( gcode );
+  tcdrain( this->_fd );
 
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
-  high_resolution_clock::time_point t2 = high_resolution_clock::now();
+  high_resolution_clock::time_point start = high_resolution_clock::now();
 
-  // Checking the output for the acknowledge/completion return
-  do {
-    readlen = read( printer_IO, buffer, sizeof( buffer )-1 );
+  for( high_resolution_clock::time_point now = high_resolution_clock::now();
+       duration_cast<microseconds>( now-start ).count() < wait_ack;
+       hw::sleep_microseconds( 1 )){
+    const std::string ack_string = this->read_str();
 
-    if( readlen > 0 ){
-      buffer[readlen] = 1;
-      ackstr          = std::string( buffer, buffer+readlen );
-      if( check_ack( gcode, ackstr ) ){
-        awk = true;
+    if( check_ack( gcode, ack_string ) ){
+      printdebug( fmt::format( "Request [%s] is done!", pstring ) );
+
+      // Flushing buffer by repeated read actions
+      for( unsigned n = ack_string.length();
+           n > 0 ;
+           n = read_str().length()){
+        hw::sleep_milliseconds( 5 );
       }
-    }
-    hw::sleep_milliseconds( 1 );
-    t2 = high_resolution_clock::now();
-  } while( !awk && duration_cast<microseconds>( t2-t1 ).count() < waitack );
 
-  // Checking output
-  if( awk ){
-    printdebug( DeviceName, fmt::format( "Request [%s] is done!", pstring ) );
-
-    // Flushing the printer buffer after executing the command.
-    while( readlen > 0 ){
-      readlen = read( printer_IO, buffer, sizeof( buffer )-1 );
-      hw::sleep_milliseconds( 5 );
-    }
-
-    return ackstr;
-  } else {
-    return RunGcode( gcode, attempt+1, waitack );
+      return ack_string;
+    } else {}
   }
+  return RunGcode( gcode, attempt+1, wait_ack );
 }
 
 
@@ -317,6 +268,7 @@ GCoder::RunGcode( const std::string& gcode,
 static bool
 check_ack( const std::string& cmd, const std::string& msg )
 {
+  if( msg.length()  == 0 ){return false;}
   auto has_substr = []( const std::string& str, const std::string& sub )->bool {
                       return str.find( sub ) != std::string::npos;
                     };
@@ -638,16 +590,14 @@ GCoder::ModifyTargetCoordinate( const double original, const double max_value )
 
   double ans = rnd( original ); // rounding to closest
   if( ans < 0.1 ){
-    printwarn( DeviceName,
-               fmt::format(
+    printwarn( fmt::format(
                  R"(Target coordinate values [%.1lf] is below the lower limit 0.1.
                  Modifying the target motion coordinate to 0.1 to avoid damaging
                  the system)",
                  ans ) );
     return 0.1;
   } else if( ans > max_value ){
-    printwarn( DeviceName,
-               fmt::format(
+    printwarn( fmt::format(
                  R"(Target coordinate values [%.1lf] is above upper limit [%.1lf].
                  Modifying the target motion coordinate to [%.1lf] to avoid damaging
                  the system)",
@@ -662,12 +612,6 @@ GCoder::ModifyTargetCoordinate( const double original, const double max_value )
 }
 
 
-GCoder::GCoder() : printer_IO( -1 ),
-  opx                        ( -1 ),
-  opy                        ( -1 ),
-  opz                        ( -1 )
-{}
-
 /**
  * @brief Destructing the GCoder::GCoder object
  *
@@ -676,11 +620,7 @@ GCoder::GCoder() : printer_IO( -1 ),
  */
 GCoder::~GCoder()
 {
-  printdebug( DeviceName, "Deallocating the gantry controls" );
-  if( printer_IO > 0 ){
-    close( printer_IO );
-  }
-  printdebug( DeviceName, "Gantry system closed" );
+  printdebug( "Deallocating the gantry controls" );
 }
 
 
@@ -697,8 +637,7 @@ PYBIND11_MODULE( gcoder, m )
 
   // Explicitly hiding the constructor instance, using just the instance method
   // for getting access to the singleton class.
-  .def( pybind11::init<>() )
-  .def( "init",            &GCoder::Init          )
+  .def( pybind11::init<const std::string&>() )
 
   // Hiding functions from python
   .def( "run_gcode",       &GCoder::RunGcode       )
@@ -709,7 +648,8 @@ PYBIND11_MODULE( gcoder, m )
   .def( "disablestepper",  &GCoder::DisableStepper )
   .def( "in_motion",       &GCoder::InMotion       )
   .def( "sendhome",        &GCoder::SendHome       )
-  .def_readwrite( "dev_path", &GCoder::dev_path )
+
+  //.def_readwrite( "dev_path", &GCoder::dev_path )
   .def_readwrite( "opx",      &GCoder::opx )
   .def_readwrite( "opy",      &GCoder::opy )
   .def_readwrite( "opz",      &GCoder::opz )

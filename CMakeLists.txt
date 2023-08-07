@@ -35,39 +35,30 @@ if( EXISTS "external/picoscope" )
 endif()
 
 # The python.logging passthorugh as a separate library
-add_library(hwlogger SHARED src/hardware/logger.cc)
-target_include_directories(hwlogger PRIVATE ${PYTHON_INCLUDE_DIRS})
-target_link_libraries(hwlogger PRIVATE ${PYTHON_LIBRARIES})
+add_library(hwsysfs SHARED src/hardware/sysfs.cc)
+target_include_directories(hwsysfs PRIVATE ${PYTHON_INCLUDE_DIRS})
+target_link_libraries(hwsysfs PRIVATE ${PYTHON_LIBRARIES})
 
 ## Libraries are supposed to be python modules
 function(make_hardware_library libname)
   pybind11_add_module(${libname} SHARED ${ARGN})
-  target_link_libraries(${libname} PRIVATE fmt::fmt hwlogger)
+  target_link_libraries(${libname} PRIVATE fmt::fmt hwsysfs)
 endfunction()
 
-# Making the various interface classes
-if( DRS_DEFINES )
-  make_control_library(drs src/drs.cc)
-  add_drs_requirements(drs)
-  add_drs_requirements(c_drs)
-  target_link_libraries(c_drs PRIVATE c_logger fmt::fmt)
-endif()
 
+make_hardware_library(gcoder      src/hardware/gcoder.cc)
+make_hardware_library(gpio        src/hardware/gpio.cc)
+make_hardware_library(i2c_ads1115 src/hardware/i2c_ads1115.cc)
 
-make_hardware_library(gcoder src/hardware/gcoder.cc )
-
-
-## The DRS4 library, this assumes that the stuff have been added to the
+# The DRS4 library, this assumes that the stuff have been added to the
 if( EXISTS "external/drs" )
   message("External package DRS found! Making the DRS readout interface")
-
   # Must use the wxwidgets
   find_package(wxWidgets COMPONENTS core base)
   if(NOT wxWidgets_FOUND)
     message(FATAL_ERROR "DRS must require wx widgets to be installed")
   endif()
   include(${wxWidgets_USE_FILE})
-
   # Selecting the minimum required files for running the interface defined in
   # the DRS.hpp interface.
   set(DRS_DEFINES OS_LINUX HAVE_LIBUSB HAVE_LIBUSB10 USE_DRS_MUTEX)

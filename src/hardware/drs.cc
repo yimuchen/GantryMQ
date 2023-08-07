@@ -22,7 +22,7 @@
  * [ref]: https://www.psi.ch/en/drs/software-download
  */
 // Custom short hand directories
-#include "logger.hpp"
+#include "sysfs.hpp"
 #include "threadsleep.hpp"
 
 // DRS library
@@ -30,6 +30,7 @@
 
 // Standard C++ libraries
 #include <fmt/printf.h>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -38,7 +39,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-class DRSContainer
+class DRSContainer : private hw::fd_accessor
 {
 public:
   DRSContainer();
@@ -46,7 +47,6 @@ public:
   DRSContainer( const DRSContainer&& ) = delete;
   ~DRSContainer();
 
-  void Init();
   void StartCollect();
   void ForceStop();
 
@@ -99,9 +99,9 @@ private:
 
   std::vector<float> GetWaveFormRaw( const unsigned channel );
   std::vector<float> GetTimeArrayRaw( const unsigned channel );
-};
 
-static const std::string DeviceName = "DRSContainer";
+  static std::string make_lockfile();
+};
 
 
 /**
@@ -113,29 +113,28 @@ static const std::string DeviceName = "DRSContainer";
  * commented out to make sure future development doesn't open certain settings
  * that is already known to cause issues by accident.
  */
-void
-DRSContainer::Init()
+DRSContainer::DRSContainer() :
+  hw::fd_accessor( "DRS", make_lockfile(), hw::fd_accessor::MODE::READ_WRITE ),
+  drs            ( nullptr ),
+  board          ( nullptr )
 {
-  printdebug( DeviceName, "Setting up DRS devices..." );
+  printdebug( "Setting up DRS devices..." );
   char str[256];
   drs = std::make_unique<DRS>();
   if( drs->GetError( str, sizeof( str ) ) ){
     drs = nullptr;
-    throw device_exception( DeviceName,
-                            fmt::format(
-                              "Error created DRS instance: %s",
-                              str ) );
+    raise_error( fmt::format( "Error created DRS instance: [{0:s}]", str ) );
   }
   if( !drs->GetNumberOfBoards() ){
-    throw device_exception( DeviceName, "No DRS boards found" );
+    drs = nullptr;
+    raise_error( "No DRS boards found" );
   }
 
   // Only getting the first board for now.
   board = drs->GetBoard( 0 );
   board->Init();
-  printdebug( DeviceName,
-              fmt::format(
-                "Found DRS[%d] board on USB, serial [%04d], firmware [%5d]\n",
+  printdebug( fmt::format(
+                "Found DRS[{0:d}] board on USB, serial [{1:04d}], firmware [{2:5d}]\n",
                 board->GetDRSType(),
                 board->GetBoardSerialNumber(),
                 board->GetFirmwareVersion() ));
@@ -164,7 +163,7 @@ DRSContainer::Init()
   // Additional sleep for configuration to get through.
   hw::sleep_microseconds( 5 );
 
-  printdebug( DeviceName, "Completed setting DRS Container" );
+  printdebug( "Completed setting DRS Container" );
 }
 
 
@@ -227,7 +226,7 @@ DRSContainer::GetWaveFormRaw( const unsigned channel )
   // channel 1 input, and so on.
   int status = board->GetWave( 0, channel * 2, waveform );
   if( status ){
-    throw device_exception( DeviceName, "Error running DRSBoard::GetWave" );
+    raise_error( "Error running DRSBoard::GetWave" );
   }
   return std::vector<float>( waveform, waveform+len );
 }
@@ -317,12 +316,13 @@ DRSContainer::DumpBuffer( const unsigned channel )
   const auto     time_array   = GetTimeArrayRaw( channel );
   const unsigned length       = GetSamples();
   std::string    output_table = "";
-  output_table += fmt::sprintf( "%s | Channel%d | [mV]\n", "Time", channel );
+  output_table +=
+    fmt::format( "{0:s} | Channel{1:d} | [mV]\n", "Time", channel );
   for( unsigned i = 0; i < length; ++i ){
     output_table +=
-      fmt::sprintf( "%.3lf | %.2lf\n", time_array[i], waveform[i] );
+      fmt::format( "{0:.3f} | {1:.2f}\n", time_array[i], waveform[i] );
   }
-  printdebug( DeviceName, output_table );
+  printdebug( output_table );
 }
 
 
@@ -478,7 +478,7 @@ void
 DRSContainer::CheckAvailable() const
 {
   if( !IsAvailable() ){
-    throw device_exception( DeviceName, "DRS4 board is not available" );
+    raise_error( "DRS4 board is not available" );
   }
 }
 
@@ -539,11 +539,29 @@ public:
 }
 
 
-DRSContainer::DRSContainer() : board( nullptr ){}
+std::string
+DRSContainer::make_lockfile()
+{
+  const std::string filename = "/tmp/drs.lock";
+
+  // Checking if the lock file actually exists. Creating if not.
+  std::fstream lock_fs;
+  lock_fs.open( filename,
+                std::fstream::in | std::fstream::out | std::fstream::app );
+
+  if( !lock_fs ){
+    lock_fs.open( filename,
+                  std::fstream::in | std::fstream::out | std::fstream::trunc );
+  }
+  lock_fs.close();
+
+  return filename;
+}
+
 
 DRSContainer::~DRSContainer()
 {
-  printdebug( DeviceName, "Deallocating the DRS controller" );
+  printdebug( "Deallocating the DRS controller" );
 }
 
 
@@ -553,7 +571,6 @@ PYBIND11_MODULE( drs, m )
 
   // Special singleton syntax, do *NOT* define the __init__ method
   .def( pybind11::init<>() )
-  .def( "init",              &DRSContainer::Init )
   .def( "timeslice",         &DRSContainer::GetTimeArray )
   .def( "startcollect",      &DRSContainer::StartCollect )
   .def( "forcestop",         &DRSContainer::ForceStop )
