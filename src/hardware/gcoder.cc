@@ -63,6 +63,8 @@ public:
                              float y = std::nanf(""),
                              float z = std::nanf("") );
 
+  void clear_buffer() const;
+
   //
   void MoveTo( float x = std::nanf(""),
                float y = std::nanf(""),
@@ -74,13 +76,15 @@ public:
                   float z = std::nanf(""));
 
   // Floating point comparison.
-  static bool MatchCoord( double x, double y );
-  double      ModifyTargetCoordinate( double orig, const double max );
+  static bool MatchCoord( float x, float y );
+  float       ModifyTargetCoordinate( float orig, const float max );
+
+  static inline float round_val( float x ){ return std::round( x * 10 ) / 10;}
 
   // Helper methods
-  float opx, opy, opz;           /** target position of the printer */
-  float cx, cy, cz;           /** current position of the printer */
-  float vx, vy, vz;           /** Speed of the gantry head. */
+  float opx, opy, opz; /** target position of the printer */
+  float cx, cy, cz;    /** current position of the printer */
+  float vx, vy, vz;    /** Speed of the gantry head. */
   // Constructor and destructor
   GCoder( const std::string& dev_path );
   GCoder()                 = delete;
@@ -134,7 +138,7 @@ GCoder::GCoder( const std::string& dev_path ) :  //
 
   if( tcgetattr( this->_fd, &tty ) < 0 ){
     raise_error( fmt::format(
-                   "Error getting termios settings. Returned code [%s]",
+                   "Error getting termios settings. Returned code [{0:s}]",
                    strerror( errno ) ) );
   }
 
@@ -159,12 +163,13 @@ GCoder::GCoder( const std::string& dev_path ) :  //
   tty.c_cc[VTIME] = 0;
 
   if( tcsetattr( this->_fd, TCSANOW, &tty ) != 0 ){
-    raise_error( fmt::format( "Error setting termios. Returned code [%s]",
+    raise_error( fmt::format( "Error setting termios. Returned code [{0:s}]",
                               strerror( errno )) );
   }
 
   printmsg( "Waking up printer...." );
-  hw::sleep_seconds( 1 );
+  hw::sleep_seconds( 10 );
+  clear_buffer(); // Flushing the buffer is required for first start up ()
   SendHome( true, true, true );
   hw::sleep_milliseconds( 5 );
 
@@ -219,30 +224,34 @@ GCoder::RunGcode( const std::string& gcode,
                            gcode,
                            this->_dev_path,
                            attempt ));
-  this->write( gcode+'\n' ); // Adding an end of string character
+  this->write( gcode+"\n" ); // Adding an end of string character
   tcdrain( this->_fd );
 
   high_resolution_clock::time_point start = high_resolution_clock::now();
 
   for( high_resolution_clock::time_point now = high_resolution_clock::now();
        duration_cast<microseconds>( now-start ).count() < wait_ack;
-       hw::sleep_microseconds( 1 )){
+       now = high_resolution_clock::now() ){
+    hw::sleep_milliseconds( 1 );
     const std::string ack_string = this->read_str();
 
     if( check_ack( gcode, ack_string ) ){
-      printdebug( fmt::format( "Request [%s] is done!", gcode ) );
-
-      // Flushing buffer by repeated read actions
-      for( unsigned n = ack_string.length();
-           n > 0 ;
-           n = read_str().length()){
-        hw::sleep_milliseconds( 5 );
-      }
-
+      printdebug( fmt::format( "Request [{0:s}] is done!", gcode ) );
+      clear_buffer();
       return ack_string;
-    } else {}
+    }
   }
   return RunGcode( gcode, wait_ack, attempt+1 );
+}
+
+
+void
+GCoder::clear_buffer() const
+{
+  // Flushing buffer by repeated read actions
+  for( unsigned n = 1; n > 0 ; n = this->read_str().length()){
+    hw::sleep_milliseconds( 5 );
+  }
 }
 
 
@@ -400,10 +409,10 @@ GCoder::SetSpeedLimit( float x, float y, float z )
   if( y > maxv ){ y = maxv; }
   if( z > maxv ){ z = maxz; }
 
-  RunGcode( fmt::format( "M203 X%.2f Y%.2f Z%.2f", x, y, z ), 1e5 );
+  RunGcode( fmt::format( "M203 X{0:.2f} Y{1:.2f} Z{2:.2f}", x, y, z ), 1e5 );
 
   const float vmax = std::max( std::max( x, y ), z );
-  RunGcode( fmt::format( "G0 F%.2f", vmax * 60 ), 1e5 );
+  RunGcode( fmt::format( "G0 F{0:.2f}", vmax * 60 ), 1e5 );
 
   vx = x;
   vy = y;
@@ -438,7 +447,8 @@ GCoder::MoveToRaw( float x, float y, float z )
   opz = ModifyTargetCoordinate( opz, max_z() );
 
   // Running the code
-  RunGcode( fmt::format( "G0 X%.1f Y%.1f Z%.1f", opx, opy, opz ), 1000 );
+  RunGcode( fmt::format( "G0 X{0:.1f} Y{1:.1f} Z{2:.1f}", opx, opy, opz ),
+            1000 );
 
   return;
 }
@@ -491,9 +501,9 @@ GCoder::InMotion( float x, float y, float z )
   }
 
   // Supposedly the check matching coordinate
-  const double tx = ModifyTargetCoordinate( x, max_x() );
-  const double ty = ModifyTargetCoordinate( y, max_y() );
-  const double tz = ModifyTargetCoordinate( z, max_z() );
+  const float tx = ModifyTargetCoordinate( x, max_x() );
+  const float ty = ModifyTargetCoordinate( y, max_y() );
+  const float tz = ModifyTargetCoordinate( z, max_z() );
 
   if( MatchCoord( tx, cx ) && MatchCoord( ty, cy ) && MatchCoord( tz, cz ) ){
     return false;
@@ -544,12 +554,10 @@ GCoder::MoveTo( float x, float y, float z )
  * the gantry resolution of 0.1 mm
  */
 bool
-GCoder::MatchCoord( double x, double y )
+GCoder::MatchCoord( const float x, const float y )
 {
   // Rounding to closes 0.1
-  x = std::round( x * 10 ) / 10;
-  y = std::round( y * 10 ) / 10;
-  return x == y;
+  return GCoder::round_val( x ) == GCoder::round_val( y );
 }
 
 
@@ -569,29 +577,26 @@ GCoder::MatchCoord( double x, double y )
  * error message will be displayed to ensure notify the user of these
  * modifications.
  */
-double
-GCoder::ModifyTargetCoordinate( const double original, const double max_value )
+float
+GCoder::ModifyTargetCoordinate( const float original, const float max_value )
 {
-  auto rnd = []( double x ){ return std::round( x * 10 ) / 10;};
-
-  double ans = rnd( original ); // rounding to closest
+  float ans = GCoder::round_val( original ); // rounding to closest
   if( ans < 0.1 ){
     printwarn( fmt::format(
-                 R"(Target coordinate values [%.1lf] is below the lower limit 0.1.
+                 R"(Target coordinate values [{0:.1f}] is below the lower limit 0.1.
                  Modifying the target motion coordinate to 0.1 to avoid damaging
                  the system)",
                  ans ) );
     return 0.1;
   } else if( ans > max_value ){
     printwarn( fmt::format(
-                 R"(Target coordinate values [%.1lf] is above upper limit [%.1lf].
-                 Modifying the target motion coordinate to [%.1lf] to avoid damaging
-                 the system)",
+                 R"(Target coordinate values [{0:.1f}] is above upper limit
+                 [{1:.1f}]. Modifying the target motion coordinate to [{1:.1f}] to
+                 avoid damaging the system)",
                  ans,
-                 max_value,
                  max_value ));
 
-    return rnd( max_value );
+    return GCoder::round_val( max_value );
   } else {
     return ans;
   }
@@ -619,7 +624,7 @@ GCoder::~GCoder()
 
 PYBIND11_MODULE( gcoder, m )
 {
-  pybind11::class_<GCoder>( m, "GCoder" )
+  pybind11::class_<GCoder>( m, "gcoder" )
 
   // Explicitly hiding the constructor instance, using just the instance method
   // for getting access to the singleton class.
