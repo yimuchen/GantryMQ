@@ -52,7 +52,7 @@ public:
 i2c_ads1115::i2c_ads1115( const uint8_t bus_id,  const uint8_t dev_id ) : //
   hw::fd_accessor( fmt::format( "ads1115@{0:#x}:{1:#x}", bus_id, dev_id ),  //
                    fmt::format( "/dev/i2c-{0:d}", bus_id ), //
-                   hw::fd_accessor::MODE::READ_WRITE )
+                   hw::fd_accessor::MODE::READ_WRITE, false )
 {
   // connect to ADS1115 as i2c slave
   if( ioctl( _fd, I2C_SLAVE, dev_id ) == -1 ){
@@ -120,9 +120,11 @@ PYBIND11_MODULE( i2c_ads1115, m )
   .def( "read_mv",
         &i2c_ads1115::read_mv,
         "Returning the readout values in mV",
-        pybind11::arg( "channel" ),
+        pybind11::arg(
+          "channel" ),
         pybind11::arg( "range" ),
-        pybind11::arg( "rate" ) = i2c_ads1115::ADS_RATE_250SPS )
+        pybind11::arg(
+          "rate" ) = i2c_ads1115::ADS_RATE_250SPS )
 
   //.def_readwrite( "dev_path", &GCoder::dev_path )
   .def_readonly_static( "ADS_RANGE_6V",    &i2c_ads1115::ADS_RANGE_6V )
