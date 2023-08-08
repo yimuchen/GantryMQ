@@ -85,7 +85,11 @@ fd_accessor::close_with_error( const std::string& message )
 std::string
 fd_accessor::intarray_to_string( const std::vector<uint8_t>& message )
 {
-  return "";
+  std::string ans = "0x";
+  for( auto x : message ){
+    ans += fmt::format( "{0:X}", x );
+  }
+  return ans;
 }
 
 
@@ -103,9 +107,9 @@ fd_accessor::write( const std::vector<uint8_t>& message ) const
   int n_written =  ::write( this->_fd, message.data(), message.size() );
   if( n_written != (int)message.size() ){
     raise_error( fmt::format(
-                   "Error writing [{0:s}] to file descriptor [{1:d}].  Expected [{2:d}], got [{3:d}]",
+                   "Error writing [{0:s}] to file descriptor [{1:s}].  Expected [{2:d}], got [{3:d}]",
                    fd_accessor::intarray_to_string( message ),
-                   this->_fd,
+                   this->_dev_path,
                    message.size(),
                    n_written ));
   }
@@ -150,7 +154,7 @@ fd_accessor::read_str( const unsigned n ) const
 
   if( ( n > 0 )  && ( readlen != (int)n ) ){
     raise_error( fmt::format(
-                   "mismatch message length. Expected [{0:d}], got [{0:d}]",
+                   "mismatch message length. Expected [{0:d}], got [{1:d}]",
                    n,
                    readlen ));
   }
@@ -195,7 +199,7 @@ logger_wrapped( const std::string& device,
                 const std::string& message )
 {
   PyObject* logging_name =
-    Py_BuildValue( "s", fmt::format( "SiPMCalibCMD.{0}", device ).c_str()  );
+    Py_BuildValue( "s", fmt::format( "GantryMQ.{0:s}", device ).c_str()  );
   PyObject* logging_args = Py_BuildValue( "(is)", level, message.c_str() );
   PyObject* logging_obj  = PyObject_CallMethod( logging_lib,
                                                 "getLogger",
