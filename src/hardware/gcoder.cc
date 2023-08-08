@@ -49,10 +49,9 @@ public:
   static float max_x(){ return _max_x; }
   static float max_y(){ return _max_y; }
   static float max_z(){ return _max_z; }
-  void        Init( const std::string& dev );
   std::string RunGcode( const std::string& gcode,
-                        const unsigned     attempt = 0,
-                        const unsigned     waitack = 1e4 ) const;
+                        const unsigned     waitack = 1e4,
+                        const unsigned     attempt = 0 ) const;
 
   // Motion command abstraction
   std::string GetSettings() const;
@@ -173,7 +172,7 @@ GCoder::GCoder( const std::string& dev_path ) :  //
   SetSpeedLimit( 1000, 1000, 1000 );
 
   // Setting acceleration to 3x the factory default:
-  RunGcode( "M201 X1000 Y1000 Z300", 0, 1e5 );
+  RunGcode( "M201 X1000 Y1000 Z300", 1e5 );
 
   return;
 }
@@ -198,8 +197,8 @@ GCoder::GCoder( const std::string& dev_path ) :  //
  */
 std::string
 GCoder::RunGcode( const std::string& gcode,
-                  const unsigned     attempt,
-                  const unsigned     wait_ack ) const
+                  const unsigned     wait_ack,
+                  const unsigned     attempt ) const
 {
   using namespace std::chrono;
 
@@ -243,7 +242,7 @@ GCoder::RunGcode( const std::string& gcode,
       return ack_string;
     } else {}
   }
-  return RunGcode( gcode, attempt+1, wait_ack );
+  return RunGcode( gcode, wait_ack, attempt+1 );
 }
 
 
@@ -311,7 +310,7 @@ GCoder::SendHome( bool x, bool y, bool z )
     cz     = 0;
   }
 
-  RunGcode( gcode, 0, 4e9 );
+  RunGcode( gcode, 4e9 );
 }
 
 
@@ -328,13 +327,13 @@ void
 GCoder::DisableStepper( bool x, bool y, bool z )
 {
   if( x ){
-    RunGcode( "M18 X E", 0, 1e5 );
+    RunGcode( "M18 X E", 1e5 );
   }
   if( y ){
-    RunGcode( "M18 Y E", 0, 1e5 );
+    RunGcode( "M18 Y E", 1e5 );
   }
   if( z ){
-    RunGcode( "M18 Z E", 0, 1e5 );
+    RunGcode( "M18 Z E", 1e5 );
   }
 }
 
