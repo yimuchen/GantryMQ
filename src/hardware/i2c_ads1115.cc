@@ -120,8 +120,12 @@ PYBIND11_MODULE( i2c_ads1115, m )
   // Explicitly hiding the constructor instance, using just the instance method
   // for getting access to the singleton class.
   .def( pybind11::init<const uint8_t, const uint8_t>() )
-  .def( "read_mv", &i2c_ads1115::read_mv )
-
+  .def( "read_mv",
+        &i2c_ads1115::read_mv,
+        "Returning the readout values in mV",
+        pybind11::arg( "channel" ),
+        pybind11::arg( "range" ),
+        pybind11::arg( "rate" ) = i2c_ads1115::ADS_RATE_250SPS )
 
   //.def_readwrite( "dev_path", &GCoder::dev_path )
   .def_readonly_static( "ADS_RANGE_6V",    &i2c_ads1115::ADS_RANGE_6V )
