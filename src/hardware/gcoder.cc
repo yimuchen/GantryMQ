@@ -173,7 +173,7 @@ GCoder::GCoder( const std::string& dev_path ) :  //
   SetSpeedLimit( 1000, 1000, 1000 );
 
   // Setting acceleration to 3x the factory default:
-  RunGcode( "M201 X1000 Y1000 Z300\n", 0, 1e5 );
+  RunGcode( "M201 X1000 Y1000 Z300", 0, 1e5 );
 
   return;
 }
@@ -206,25 +206,21 @@ GCoder::RunGcode( const std::string& gcode,
   // static variables
   static const unsigned maxtry = 10;
 
-  // Pretty output
-  std::string pstring = gcode;
-  pstring[pstring.length()-1] = '\0';// Getting rid of trailing new line
-
   if( attempt >= maxtry ){
     raise_error(
       fmt::format(
-        R"(ACK string for command [%s] was not received after [%d] attempts!
+        R"(ACK string for command [{0:s}] was not received after [{1:d}] attempts!
         The message could be dropped or there is something wrong with the device!)",
-        pstring,
+        gcode,
         maxtry ) );
   }
 
   // Sending output
-  printdebug( fmt::format( "[%s] to USBTERM[%d] (attempt %u)",
+  printdebug( fmt::format( "[{0:s}] to USBTERM[{1:s}] (attempt {2:d})",
                            pstring,
                            this->_dev_path,
                            attempt ));
-  this->write( gcode );
+  this->write( gcode+'\n' ); // Adding an end of string character
   tcdrain( this->_fd );
 
   high_resolution_clock::time_point start = high_resolution_clock::now();
@@ -291,34 +287,31 @@ check_ack( const std::string& cmd, const std::string& msg )
 void
 GCoder::SendHome( bool x, bool y, bool z )
 {
-  char cmd[80] = "G28";
+  std::string gcode = "G28";
 
   if( !x && !y && !z ){
     return;
   }
 
   if( x ){
-    strcat( cmd, " X" );
-    opx = 0;
-    cx  = 0;
+    gcode += " X";
+    opx    = 0;
+    cx     = 0;
   }
 
   if( y ){
-    strcat( cmd, " Y" );
-    opy = 0;
-    cy  = 0;
+    gcode += " Y";
+    opy    = 0;
+    cy     = 0;
   }
 
   if( z ){
-    strcat( cmd, " Z" );
-    opz = 0;
-    cz  = 0;
+    gcode += " Z";
+    opz    = 0;
+    cz     = 0;
   }
 
-  // Adding end of line character.
-  strcat( cmd, "\n" );
-
-  RunGcode( cmd, 0, 4e9 );
+  RunGcode( gcode, 0, 4e9 );
 }
 
 
@@ -335,13 +328,13 @@ void
 GCoder::DisableStepper( bool x, bool y, bool z )
 {
   if( x ){
-    RunGcode( "M18 X E\n", 0, 1e5 );
+    RunGcode( "M18 X E", 0, 1e5 );
   }
   if( y ){
-    RunGcode( "M18 Y E\n", 0, 1e5 );
+    RunGcode( "M18 Y E", 0, 1e5 );
   }
   if( z ){
-    RunGcode( "M18 Z E\n", 0, 1e5 );
+    RunGcode( "M18 Z E", 0, 1e5 );
   }
 }
 
@@ -356,13 +349,13 @@ void
 GCoder::EnableStepper( bool x, bool y, bool z )
 {
   if( x ){
-    RunGcode( "M17 X\n", 0, 1e5 );
+    RunGcode( "M17 X", 0, 1e5 );
   }
   if( y ){
-    RunGcode( "M17 Y\n", 0, 1e5 );
+    RunGcode( "M17 Y", 0, 1e5 );
   }
   if( z ){
-    RunGcode( "M17 Z\n", 0, 1e5 );
+    RunGcode( "M17 Z", 0, 1e5 );
   }
 }
 
@@ -373,7 +366,7 @@ GCoder::EnableStepper( bool x, bool y, bool z )
 std::string
 GCoder::GetSettings() const
 {
-  return RunGcode( "M503\n" );
+  return RunGcode( "M503" );
 }
 
 
@@ -408,16 +401,10 @@ GCoder::SetSpeedLimit( float x, float y, float z )
   if( y > maxv ){ y = maxv; }
   if( z > maxv ){ z = maxz; }
 
-  RunGcode( fmt::format(
-              "M203 X%.2f Y%.2f Z%.2f\n",
-              x,
-              y,
-              z ),
-            0,
-            1e5 );
+  RunGcode( fmt::format( "M203 X%.2f Y%.2f Z%.2f", x, y, z ), 0, 1e5 );
 
   const float vmax = std::max( std::max( x, y ), z );
-  RunGcode( fmt::format( "G0 F%.2f\n", vmax * 60 ), 0, 1e5 );
+  RunGcode( fmt::format( "G0 F%.2f", vmax * 60 ), 0, 1e5 );
 
   vx = x;
   vy = y;
@@ -452,7 +439,7 @@ GCoder::MoveToRaw( float x, float y, float z )
   opz = ModifyTargetCoordinate( opz, max_z() );
 
   // Running the code
-  RunGcode( fmt::format( "G0 X%.1f Y%.1f Z%.1f\n", opx, opy, opz ), 0, 1000 );
+  RunGcode( fmt::format( "G0 X%.1f Y%.1f Z%.1f", opx, opy, opz ), 0, 1000 );
 
   return;
 }
@@ -485,7 +472,7 @@ GCoder::InMotion( float x, float y, float z )
   float       a, b, c, temp;// feed position of extruder.
   int         check;
   try {
-    checkmsg = RunGcode( "M114\n" );
+    checkmsg = RunGcode( "M114" );
     check    = sscanf(
       checkmsg.c_str(),
       "X:%f Y:%f Z:%f E:%f Count X:%f Y:%f Z:%f",
@@ -639,7 +626,7 @@ PYBIND11_MODULE( gcoder, m )
   // for getting access to the singleton class.
   .def( pybind11::init<const std::string&>() )
 
-  // Hiding functions from python
+  // Exposing function to python
   .def( "run_gcode",       &GCoder::RunGcode       )
   .def( "getsettings",     &GCoder::GetSettings    )
   .def( "set_speed_limit", &GCoder::SetSpeedLimit  )
