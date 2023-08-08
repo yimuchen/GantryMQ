@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(SiPMControl CXX)
+project(GantryMQ CXX)
 
 ## Compiler settings
 set(CMAKE_CXX_STANDARD 17)
@@ -19,9 +19,7 @@ set(INCLUDE)
 find_package(PythonLibs    3 REQUIRED)
 find_package(PythonInterp  3 REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
-find_package(OpenCV          REQUIRED)
 find_package(fmt             REQUIRED)
-find_package(Boost COMPONENTS serialization)
 
 
 # The Picoscope library, this assumes that the interface has been added to the
