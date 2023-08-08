@@ -55,9 +55,11 @@ i2c_ads1115::i2c_ads1115( const uint8_t bus_id,  const uint8_t dev_id ) : //
                    hw::fd_accessor::MODE::READ_WRITE )
 {
   // connect to ADS1115 as i2c slave
-  if( ioctl( _fd, I2C_SLAVE, dev_id ) == hw::IO_FAILED ){
-    this->close_with_error( fmt::format( "Error: Couldn't access i2c [{0:d}]!",
-                                         _dev_name ));
+  if( ioctl( _fd, I2C_SLAVE, dev_id ) == -1 ){
+    this->close_with_error(
+      fmt::format( "Error: Couldn't access i2c [{0:d}@{:d}]!",
+                   _dev_name,
+                   dev_id ));
   }
 }
 
@@ -94,16 +96,11 @@ i2c_ads1115::read_mv( const uint8_t channel,
   int16_t              val_int   = val_bytes[0] << 8 | val_bytes[1];
 
   // Conversion factor based on requested range.
-  const float conv = range == ADS_RANGE_6V  ?
-                     6144.0 / 32678.0 :
-                     range == ADS_RANGE_4V  ?
-                     4096.0 / 32678.0 :
-                     range == ADS_RANGE_2V  ?
-                     2048.0 / 32678.0 :
-                     range == ADS_RANGE_1V  ?
-                     1024.0 / 32678.0 :
-                     range == ADS_RANGE_p5V ?
-                     512.0 / 32678.0  :
+  const float conv = range == ADS_RANGE_6V  ? 6144.0 / 32678.0 : //
+                     range == ADS_RANGE_4V  ? 4096.0 / 32678.0 : //
+                     range == ADS_RANGE_2V  ? 2048.0 / 32678.0 : //
+                     range == ADS_RANGE_1V  ? 1024.0 / 32678.0 : //
+                     range == ADS_RANGE_p5V ? 512.0 / 32678.0  : //
                      256.0 / 32678.0;
   return float(val_int) * conv;
 }

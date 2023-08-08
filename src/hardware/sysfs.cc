@@ -39,7 +39,7 @@ fd_accessor::fd_accessor( const std::string& dev_name,
   this->_dev_path = dev_path;
   this->_mode     = mode;
   this->_fd       = open( dev_path.c_str(), mode );
-  if( this->_fd == hw::OPEN_FAILED ){
+  if( this->_fd == -1 ){
     raise_error( fmt::format( "Failed to open path [{0:s}]", dev_path ) );
   }
 
@@ -144,8 +144,8 @@ fd_accessor::read_str( const unsigned n ) const
   static constexpr uint16_t buf_size = 65535;
 
   char      buffer[buf_size] = {};
-  const int readlen          = n == 0 ?
-                               ::read( this->_fd, buffer, sizeof( buffer )-1 ) :
+  const int readlen          = ( n == 0 ) ? //
+                               ::read( this->_fd, buffer, sizeof( buffer )-1 ) : //
                                ::read( this->_fd, buffer, n );
 
   if( ( n > 0 )  && ( readlen != (int)n ) ){

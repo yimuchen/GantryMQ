@@ -216,7 +216,7 @@ GCoder::RunGcode( const std::string& gcode,
 
   // Sending output
   printdebug( fmt::format( "[{0:s}] to USBTERM[{1:s}] (attempt {2:d})",
-                           pstring,
+                           gcode,
                            this->_dev_path,
                            attempt ));
   this->write( gcode+'\n' ); // Adding an end of string character
@@ -230,7 +230,7 @@ GCoder::RunGcode( const std::string& gcode,
     const std::string ack_string = this->read_str();
 
     if( check_ack( gcode, ack_string ) ){
-      printdebug( fmt::format( "Request [%s] is done!", pstring ) );
+      printdebug( fmt::format( "Request [%s] is done!", gcode ) );
 
       // Flushing buffer by repeated read actions
       for( unsigned n = ack_string.length();
@@ -348,13 +348,13 @@ void
 GCoder::EnableStepper( bool x, bool y, bool z )
 {
   if( x ){
-    RunGcode( "M17 X", 0, 1e5 );
+    RunGcode( "M17 X", 1e5 );
   }
   if( y ){
-    RunGcode( "M17 Y", 0, 1e5 );
+    RunGcode( "M17 Y", 1e5 );
   }
   if( z ){
-    RunGcode( "M17 Z", 0, 1e5 );
+    RunGcode( "M17 Z", 1e5 );
   }
 }
 
@@ -400,10 +400,10 @@ GCoder::SetSpeedLimit( float x, float y, float z )
   if( y > maxv ){ y = maxv; }
   if( z > maxv ){ z = maxz; }
 
-  RunGcode( fmt::format( "M203 X%.2f Y%.2f Z%.2f", x, y, z ), 0, 1e5 );
+  RunGcode( fmt::format( "M203 X%.2f Y%.2f Z%.2f", x, y, z ), 1e5 );
 
   const float vmax = std::max( std::max( x, y ), z );
-  RunGcode( fmt::format( "G0 F%.2f", vmax * 60 ), 0, 1e5 );
+  RunGcode( fmt::format( "G0 F%.2f", vmax * 60 ), 1e5 );
 
   vx = x;
   vy = y;
@@ -438,7 +438,7 @@ GCoder::MoveToRaw( float x, float y, float z )
   opz = ModifyTargetCoordinate( opz, max_z() );
 
   // Running the code
-  RunGcode( fmt::format( "G0 X%.1f Y%.1f Z%.1f", opx, opy, opz ), 0, 1000 );
+  RunGcode( fmt::format( "G0 X%.1f Y%.1f Z%.1f", opx, opy, opz ), 1000 );
 
   return;
 }

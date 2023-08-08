@@ -12,11 +12,6 @@
 namespace hw
 {
 
-static constexpr int UNOPENED    = -2;
-static constexpr int OPEN_FAILED = -1;
-static constexpr int IO_FAILED   = -1;
-static constexpr int NORMAL_PTR  = 0;
-
 /**
  * @brief Simple wrapper for ensuring the file descriptor access lifetime
  */
