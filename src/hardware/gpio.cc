@@ -57,8 +57,7 @@ gpio::make_device_name( const uint8_t pin_idx, const int direction )
   // Enabling pin
   hw::fd_accessor( "GPIO_export", "/sys/class/gpio/export", O_WRONLY )
   .write( fmt::format( "{0:d}", pin_idx ) );
-
-  hw::sleep_milliseconds( 100 );
+  hw::sleep_milliseconds( 1 );
 
   // Getting the direction path
   const std::string dir_path = fmt::format(
@@ -66,10 +65,9 @@ gpio::make_device_name( const uint8_t pin_idx, const int direction )
     pin_idx );
 
   hw::fd_accessor::wait_fd_access( dir_path );
-  hw::fd_accessor( "GPIO_dir", dir_path, O_WRONLY )
-  .write( ( direction == gpio::READ ) ?
-          "in" :
-          "out" );
+  hw::sleep_milliseconds( 1 );
+  hw::fd_accessor( "GPIO_dir", dir_path, O_RDWR )
+  .write( ( direction == gpio::READ ) ? "in" : "out" );
 
   return fmt::format( "GPIO_{0:d}", pin_idx );
 }
@@ -78,9 +76,7 @@ gpio::make_device_name( const uint8_t pin_idx, const int direction )
 void
 gpio::slow_write( const bool x ) const
 {
-  this->write( x ?
-               "1" :
-               "0" );
+  this->write( x ? "1" : "0" );
 }
 
 
@@ -122,5 +118,8 @@ PYBIND11_MODULE( gpio, m )
   .def( "slow_write",      &gpio::slow_write     )
   .def( "slow_read",       &gpio::slow_read      )
   .def( "pulse",           &gpio::pulse          )
+
+  .def_readonly_static( "READ",  &gpio::READ )
+  .def_readonly_static( "WRITE", &gpio::WRITE )
   ;
 }
