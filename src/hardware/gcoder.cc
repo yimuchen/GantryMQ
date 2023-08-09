@@ -58,7 +58,6 @@ public:
   void        SendHome( bool x, bool y, bool z );
   void        EnableStepper( bool x, bool y, bool z );
   void        DisableStepper( bool x, bool y, bool z );
-  bool        InMotion( float x, float y, float z );
   void        SetSpeedLimit( float x = std::nanf(""),
                              float y = std::nanf(""),
                              float z = std::nanf("") );
@@ -69,11 +68,8 @@ public:
   void MoveTo( float x = std::nanf(""),
                float y = std::nanf(""),
                float z = std::nanf(""));
-
-  //
-  void MoveToRaw( float x = std::nanf(""),
-                  float y = std::nanf(""),
-                  float z = std::nanf(""));
+  bool UpdateCoordinate();
+  bool InMotion();
 
   // Floating point comparison.
   static bool MatchCoord( float x, float y );
@@ -434,7 +430,7 @@ GCoder::SetSpeedLimit( float x, float y, float z )
  * additional parsing is required for make sure the motion has completed.
  */
 void
-GCoder::MoveToRaw( float x, float y, float z )
+GCoder::MoveTo( float x, float y, float z )
 {
   // Setting up target position
   opx = ( x == x ) ? x : opx;
@@ -451,6 +447,40 @@ GCoder::MoveToRaw( float x, float y, float z )
             1000 );
 
   return;
+}
+
+
+/**
+ * @brief Extracting the current coordinates using the M114 gcode command
+ *
+ * Returns whether the string parsing is completed
+ */
+bool
+GCoder::UpdateCoordinate()
+{
+  float a, b, c, temp; // feed position of extruder.
+  float x, y, z;       // Temporary storage of the extract coordinates.
+  try {
+    const int check = sscanf(
+      RunGcode( "M114" ).c_str(),
+      "X:%f Y:%f Z:%f E:%f Count X:%f Y:%f Z:%f",
+      &a,
+      &b,
+      &c,
+      &temp,
+      &x,
+      &y,
+      &z );
+    if( check != 7 ){ return false; } // Early exit for bad parse
+    else {
+      cx = x;
+      cy = y;
+      cz = z;
+      return true;
+    }
+  } catch( std::exception& e ){ // Return false if command fails
+    return false;
+  }
 }
 
 
@@ -475,76 +505,13 @@ GCoder::MoveToRaw( float x, float y, float z )
  * to update the current gantry coordinates.
  */
 bool
-GCoder::InMotion( float x, float y, float z )
+GCoder::InMotion()
 {
-  std::string checkmsg;
-  float       a, b, c, temp;// feed position of extruder.
-  int         check;
-  try {
-    checkmsg = RunGcode( "M114" );
-    check    = sscanf(
-      checkmsg.c_str(),
-      "X:%f Y:%f Z:%f E:%f Count X:%f Y:%f Z:%f",
-      &a,
-      &b,
-      &c,
-      &temp,
-      &cx,
-      &cy,
-      &cz );
-  } catch( std::exception& e ){
+  if( UpdateCoordinate() ){
+    return MatchCoord( opx,
+                       cx ) && MatchCoord( opy, cy ) && MatchCoord( opz, cz );
+  } else { // If updating coordinates failed. Assume the gantry is in motion
     return true;
-  }
-
-  if( check != 7 ){
-    return true;
-  }
-
-  // Supposedly the check matching coordinate
-  const float tx = ModifyTargetCoordinate( x, max_x() );
-  const float ty = ModifyTargetCoordinate( y, max_y() );
-  const float tz = ModifyTargetCoordinate( z, max_z() );
-
-  if( MatchCoord( tx, cx ) && MatchCoord( ty, cy ) && MatchCoord( tz, cz ) ){
-    return false;
-  } else {
-    return true;
-  }
-}
-
-
-/**
- * @brief Simple abstraction of the motion command to ensure motion safety.
- *
- * This motion command keeps the z coordinates above 3mm for as much as the
- * motion duration as possible. This help ensures that elements in the gantry
- * head does not impact the plate or the circuit board.
- */
-void
-GCoder::MoveTo( float x, float y, float z )
-{
-  static constexpr float min_z_safety = 3;
-
-  if( z < min_z_safety && opz < min_z_safety ){
-    MoveToRaw( opx, opy, min_z_safety );
-    hw::sleep_milliseconds( 10 );
-    MoveToRaw( x, y, min_z_safety );
-    hw::sleep_milliseconds( 10 );
-    MoveToRaw( x, y,  z );
-    hw::sleep_milliseconds( 10 );
-  } else if( opz < min_z_safety ){
-    MoveToRaw( opx, opy, min_z_safety );
-    hw::sleep_milliseconds( 10 );
-    MoveToRaw( x, y, z );
-    hw::sleep_milliseconds( 10 );
-  } else if( z < min_z_safety ){
-    MoveToRaw( x, y, min_z_safety );
-    hw::sleep_milliseconds( 10 );
-    MoveToRaw( x, y, z );
-    hw::sleep_milliseconds( 10 );
-  } else {
-    MoveToRaw( x, y, z );
-    hw::sleep_milliseconds( 10 );
   }
 }
 
