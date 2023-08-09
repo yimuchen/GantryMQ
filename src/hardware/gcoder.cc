@@ -508,9 +508,9 @@ bool
 GCoder::InMotion()
 {
   if( UpdateCoordinate() ){
-    return !( MatchCoord( opx,
-                          cx ) &&
-              MatchCoord( opy, cy ) && MatchCoord( opz, cz ));
+    return !( MatchCoord( opx, cx ) //
+              && MatchCoord( opy, cy ) //
+              && MatchCoord( opz, cz ));
   } else { // If updating coordinates failed. Assume the gantry is in motion
     return true;
   }
