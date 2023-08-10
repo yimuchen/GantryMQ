@@ -19,6 +19,11 @@
  * timeout for single shot mode once collection is requested, so the user will
  * be responsible for making sure that the appropriate trigger is provided.
  *
+ * Though devices are automatically detected via the libusb library, as handled
+ * by the upstream DRS software, for uniformity, we will still use the file
+ * descriptor class, and have the underlying file descriptor point to a lock
+ * file in the /tmp directory.
+ *
  * [ref]: https://www.psi.ch/en/drs/software-download
  */
 // Custom short hand directories
@@ -29,7 +34,7 @@
 #include "DRS.h"
 
 // Standard C++ libraries
-#include <fmt/printf.h>
+#include <fmt/core.h>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -113,7 +118,7 @@ private:
  * commented out to make sure future development doesn't open certain settings
  * that is already known to cause issues by accident.
  */
-DRSContainer::DRSContainer() :
+DRSContainer::DRSContainer() ://
   hw::fd_accessor( "DRS", make_lockfile(), hw::fd_accessor::MODE::READ_WRITE ),
   drs            ( nullptr ),
   board          ( nullptr )
@@ -185,6 +190,16 @@ DRSContainer::WaitReady()
 }
 
 
+/**
+ * @brief Getting the time slice array for precision timing of a specific
+ * channel.
+ *
+ * Notice that this only changes once a timing calibration is performed, so it
+ * can be reused between calibration runs. However, it is found that the timing
+ * variation from a regular interval deducted from the sample frequency is small
+ * enough that this function is only included for the sake of debugging and
+ * display. The timing returned is in units of nanoseconds.
+ */
 std::vector<float>
 DRSContainer::GetTimeArrayRaw( const unsigned channel )
 {
@@ -198,13 +213,10 @@ DRSContainer::GetTimeArrayRaw( const unsigned channel )
 
 /**
  * @brief Getting the time slice array for precision timing of a specific
- * channel.
+ * channel. Casting to a numpy compatible array format.
  *
- * Notice that this only changes once a timing calibration is performed, so it
- * can be reused between calibration runs. However, it is found that the timing
- * variation from a regular interval deducted from the sample frequency is small
- * enough that this function is only included for the sake of debugging and
- * display. The timing returned is in units of nanoseconds.
+ * Here we also truncate the array according to the NSamples setting for the
+ * instance.
  */
 pybind11::array_t<float>
 DRSContainer::GetTimeArray( const unsigned channel )
@@ -215,6 +227,17 @@ DRSContainer::GetTimeArray( const unsigned channel )
 }
 
 
+/**
+ * @brief Returning the last collected waveform as an array of floats
+ *
+ * This is a lowest level interface with the DRS4 API, and so no conversion
+ * will be returned here, the return vector will always be a fixed length long
+ * (2048). Conversion should be handled by the other functions.
+ *
+ * Notice that this function will wait indefinitely for the board to finish
+ * data collection. So the user is responsible for making sure that the
+ * appropriate trigger signal is sent.
+ */
 std::vector<float>
 DRSContainer::GetWaveFormRaw( const unsigned channel )
 {
@@ -233,15 +256,10 @@ DRSContainer::GetWaveFormRaw( const unsigned channel )
 
 
 /**
- * @brief Returning the last collected waveform as an array of floats
+ * @brief Returning the last collected waveform as an array of floats, casting
+ * to a numpy compatible array format.
  *
- * This is a lowest level interface with the DRS4 API, and so no conversion
- * will be returned here, the return vector will always be a fixed length long
- * (2048). Conversion should be handled by the other functions.
- *
- * Notice that this function will wait indefinitely for the board to finish
- * data collection. So the user is responsible for making sure that the
- * appropriate trigger signal is sent.
+ * We also truncate the array to the n-sample setting.
  */
 pybind11::array_t<float>
 DRSContainer::GetWaveform( const unsigned channel )
@@ -415,8 +433,6 @@ DRSContainer::SetRate( const double x )
 
 /**
  * @brief Getting the true sampling rate
- *
- * @return double
  */
 double
 DRSContainer::GetRate()
@@ -504,12 +520,10 @@ DRSContainer::IsReady()
 
 
 /**
- * @brief Simple wrapper function for running the calibration at the current
- * settings.
+ * @brief Running the timing calibration.
  *
  * This C++ function will assume that the DRS is in a correct configuration to
- * be calibrated (all inputs disconnected). Additional user instructions will
- * be handled by the python part.
+ * be calibrated (all inputs disconnected).
  */
 void
 DRSContainer::RunCalib()
@@ -538,7 +552,9 @@ public:
               TriggerDelay() );// 0 nanosecond delay by default.
 }
 
-
+/**
+ * @brief Simple method for setting the lock file.
+ */
 std::string
 DRSContainer::make_lockfile()
 {
