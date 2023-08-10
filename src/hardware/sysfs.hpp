@@ -59,10 +59,18 @@ public:
 
 
   // Messaging functions
+
+  /**
+   * @{
+   * @brief logging informations at a certain level.
+   */
   void printdebug( const std::string& x ) const;
   void printinfo( const std::string& x ) const;
   void printmsg( const std::string& x ) const;
   void printwarn( const std::string& x ) const;
+
+  /** @} */
+
   void raise_error( const std::string& x ) const;
 };
 

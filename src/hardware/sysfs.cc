@@ -1,8 +1,7 @@
 #include "sysfs.hpp"
 #include "threadsleep.hpp"
 
-//
-#include <fmt/printf.h>
+#include <fmt/core.h>
 
 // For /sys filesystem interactions
 #include <fcntl.h>
@@ -19,14 +18,16 @@ namespace hw
 {
 
 /**
- * @brief Opening a file with a lock to ensure the program is the only process on
- * the system that is using the path.
+ * @brief Class for opening a file with locking flag, to ensure the instance is
+ * the only process on the system that is using the path.
  *
- * Mainly following the solution given [here][ref]. In the case that the file
+ * @details This class wraps common file descriptor interactions, and ensures
+ * uniqueness of the instance if requested. The locking happens at construction
+ * time, following the solution given [here][ref]. In the case that the file
  * descriptor cannot be opened or the lock instance cannot be generated, the
- * existing file descriptor will be closed and a exception will be raised. Notice
- * that the system lock will automatically be removed when the corresponding file
- * descriptor is closed.
+ * existing file descriptor will be closed and a exception will be raised.
+ * Notice that the system lock will automatically be removed when the
+ * corresponding file descriptor is closed (no `funlock` operation is needed).
  *
  * [ref]: https://stackoverflow.com/questions/1599459/optimal-lock-file-method
  */
@@ -53,6 +54,9 @@ fd_accessor::fd_accessor( const std::string& dev_name,
 }
 
 
+/**
+ * @brief Boolean flag of whether the file descriptor is currently valid.
+ */
 bool
 fd_accessor::is_valid() const
 {
@@ -60,6 +64,9 @@ fd_accessor::is_valid() const
 }
 
 
+/**
+ * @brief If file descriptor is not valid, raise and exception.
+ */
 void
 fd_accessor::check_valid() const
 {
@@ -71,6 +78,11 @@ fd_accessor::check_valid() const
 }
 
 
+/**
+ * @brief Ensuring the file descriptor is closed (in case the file descriptor
+ * can be opened but wasn't able to run additional configuration), then raise
+ * and error message.
+ */
 void
 fd_accessor::close_with_error( const std::string& message )
 {
@@ -94,11 +106,13 @@ fd_accessor::intarray_to_string( const std::vector<uint8_t>& message )
 
 
 /**
- * @brief Writing to the file descriptor position. Throws exception is error
- * occurs.
+ * @brief Writing to the file descriptor.
  *
- * @param fd
- * @return int
+ * The additional checks that we will run for this operation would be:
+ * - Whether the file descriptor is valid.
+ * - Whether the written message length matches the message length.
+ *
+ * If either check fails, raise an error. We will return the write length.
  */
 int
 fd_accessor::write( const std::vector<uint8_t>& message ) const
@@ -117,6 +131,9 @@ fd_accessor::write( const std::vector<uint8_t>& message ) const
 }
 
 
+/**
+ * @brief Writing to the file descriptor (using strings).
+ */
 int
 fd_accessor::write( const std::string& message ) const
 {
@@ -125,7 +142,11 @@ fd_accessor::write( const std::string& message ) const
 
 
 /**
- * @brief Direct call of write with not error or format checking.
+ * @brief Direct call of write.
+ *
+ * Direct passthrough of the write operation with not error or format checking.
+ * Error checking should be handled by the function caller, or be skipped if
+ * rapid writes is required.
  */
 int
 fd_accessor::write_raw( const char* message, const int n ) const
@@ -134,19 +155,20 @@ fd_accessor::write_raw( const char* message, const int n ) const
 }
 
 
-std::vector<uint8_t>
-fd_accessor::read_bytes( const unsigned n ) const
-{
-  const std::string read_str = this->read_str( n );
-  return std::vector<uint8_t>( read_str.begin(), read_str.end() );
-}
-
-
+/**
+ * @brief Reading from the file descriptor to a string.
+ *
+ * User can specific a length to read. If not provided, then we simply read
+ * however much is available at the file descriptor. If the read length is
+ * provided, then we also check the return string length for it to ensure that
+ * the matches the expected string length.
+ */
 std::string
 fd_accessor::read_str( const unsigned n ) const
 {
   static constexpr uint16_t buf_size = 65535;
 
+  this->check_valid();
   char      buffer[buf_size] = {};
   const int readlen          = ( n == 0 ) ? //
                                ::read( this->_fd, buffer, sizeof( buffer )-1 ) : //
@@ -162,6 +184,20 @@ fd_accessor::read_str( const unsigned n ) const
 }
 
 
+/**
+ * @brief Reading from the file descriptor, and cast string to uint8 array.
+ */
+std::vector<uint8_t>
+fd_accessor::read_bytes( const unsigned n ) const
+{
+  const std::string read_str = this->read_str( n );
+  return std::vector<uint8_t>( read_str.begin(), read_str.end() );
+}
+
+
+/**
+ * @brief Suspending the thread until the path becomes accessible.
+ */
 void
 fd_accessor::wait_fd_access( const std::string& path )
 {
@@ -171,6 +207,9 @@ fd_accessor::wait_fd_access( const std::string& path )
 }
 
 
+/**
+ * @brief Ensuring the file descriptor closes when our class goes out of scope.
+ */
 fd_accessor::~fd_accessor()
 {
   if( this->is_valid() ){
@@ -187,9 +226,11 @@ static PyObject* logging_lib = PyImport_ImportModuleNoBlock( "logging" );
 /**
  * @brief Wrapping the python.logging modules call into a C function.
  *
- * Function modified from here: https://kalebporter.medium.com/logging-extending-python-with-c-or-c-fa746466b602
+ * Logging is elevated to the python logging modules for easier filtering and
+ * formatting at user level. The function used is modified from here:
+ * https://kalebporter.medium.com/logging-extending-python-with-c-or-c-fa746466b602
  *
- * @param name The name of the logger
+ * @param name The name of the sublogger to use.
  * @param level The info level
  * @param message The message string
  */
@@ -211,10 +252,6 @@ logger_wrapped( const std::string& device,
 }
 
 
-/**
- * @brief Printing a message on screen with a standard header. This is
- * implemented as a parallel to the update method.
- */
 void
 hw::fd_accessor::printdebug( const std::string& msg ) const
 {
@@ -222,10 +259,6 @@ hw::fd_accessor::printdebug( const std::string& msg ) const
 }
 
 
-/**
- * @brief
- *
- */
 void
 hw::fd_accessor::printinfo( const std::string& msg ) const
 {
@@ -233,10 +266,6 @@ hw::fd_accessor::printinfo( const std::string& msg ) const
 }
 
 
-/**
- * @brief Printing a message on screen with a standard header. This is
- * implemented as a parallel to the update method.
- */
 void
 hw::fd_accessor::printmsg( const std::string& msg ) const
 {
@@ -244,10 +273,6 @@ hw::fd_accessor::printmsg( const std::string& msg ) const
 }
 
 
-/**
- * @brief Printing a message on screen with the standard yellow `[WARNING]`
- * string at the start of the line.
- */
 void
 hw::fd_accessor::printwarn( const std::string& msg ) const
 {
@@ -255,6 +280,9 @@ hw::fd_accessor::printwarn( const std::string& msg ) const
 }
 
 
+/**
+ * @brief Standard method for raising an error.
+ */
 void
 hw::fd_accessor::raise_error( const std::string& msg ) const
 {
