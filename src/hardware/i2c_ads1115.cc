@@ -13,8 +13,9 @@
 /**
  * @brief Specialized interactions with the ADS1115 ADC chip over an I2C device.
  *
- * @details
- * Notice that all 4 channels will be forced to have identical settings.
+ * @details Notice that all 4 channels will be forced to have identical
+ * settings. While I2C devices must write operations to read data, since writes
+ * are effectively instant, we use this chip effectively as a read-only device.
  */
 class i2c_ads1115 : private hw::fd_accessor
 {
@@ -42,13 +43,17 @@ public:
   static constexpr uint8_t ADS_RATE_475SPS = 0x6;
   static constexpr uint8_t ADS_RATE_860SPS = 0x7;
 
-  // For each read request, you will need to specify the range and the sampling
-  // rate, as the channel settings will need to be set each time
   float read_mv( const uint8_t channel,
                  const uint8_t range,
                  const uint8_t rate = ADS_RATE_250SPS ) const;
 };
 
+/**
+ * @brief Opening the file descriptor. Notice that because all devices on the
+ * same I2C bus uses the same file descriptor, we will *not* lock the file
+ * descriptor. But we will need to add an additional I2C device operations to
+ * the file descriptor.
+ */
 i2c_ads1115::i2c_ads1115( const uint8_t bus_id,  const uint8_t dev_id ) : //
   hw::fd_accessor( fmt::format( "ads1115@{0:#x}:{1:#x}", bus_id, dev_id ),  //
                    fmt::format( "/dev/i2c-{0:d}", bus_id ), //
@@ -64,6 +69,13 @@ i2c_ads1115::i2c_ads1115( const uint8_t bus_id,  const uint8_t dev_id ) : //
 }
 
 
+/**
+ * @brief Returning the readout at a certain channel in units of mVs
+ *
+ * @details For each operation, you will still need to set the read range and
+ * the the sampling rate. The parsing of the write operations to raw bits is
+ * taken from this reference: http://www.bristolwatch.com/rpi/ads1115.html
+ */
 float
 i2c_ads1115::read_mv( const uint8_t channel,
                       const uint8_t range,
@@ -113,20 +125,17 @@ i2c_ads1115::~i2c_ads1115()
 PYBIND11_MODULE( i2c_ads1115, m )
 {
   pybind11::class_<i2c_ads1115>( m, "i2c_ads1115" )
-
-  // Explicitly hiding the constructor instance, using just the instance method
-  // for getting access to the singleton class.
   .def( pybind11::init<const uint8_t, const uint8_t>() )
+
+  // Read-only methods.
   .def( "read_mv",
         &i2c_ads1115::read_mv,
         "Returning the readout values in mV",
-        pybind11::arg(
-          "channel" ),
-        pybind11::arg( "range" ),
-        pybind11::arg(
-          "rate" ) = i2c_ads1115::ADS_RATE_250SPS )
+        pybind11::arg( "channel" ), //
+        pybind11::arg( "range" ), //
+        pybind11::arg( "rate" ) = i2c_ads1115::ADS_RATE_250SPS )
 
-  //.def_readwrite( "dev_path", &GCoder::dev_path )
+  // All static variables are read-only
   .def_readonly_static( "ADS_RANGE_6V",    &i2c_ads1115::ADS_RANGE_6V )
   .def_readonly_static( "ADS_RANGE_4V",    &i2c_ads1115::ADS_RANGE_4V )
   .def_readonly_static( "ADS_RANGE_2V",    &i2c_ads1115::ADS_RANGE_2V )
