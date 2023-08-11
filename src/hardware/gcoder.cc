@@ -25,7 +25,7 @@
  * [s-port]: https://www.xanthium.in/Serial-Port-Programming-on-Linux
  * [marlin]: https://marlinfw.org/meta/gcode/
  */
-#include "logger.hpp"
+#include "sysfs.hpp"
 #include "threadsleep.hpp"
 
 // Standard C++ libraries
@@ -40,58 +40,59 @@
 // Pybind11
 #include <pybind11/pybind11.h>
 
-class GCoder
+class GCoder : private hw::fd_accessor
 {
 public:
-  static const float _max_x;
-  static const float _max_y;
-  static const float _max_z;
-  static float max_x(){ return _max_x; }
-  static float max_y(){ return _max_y; }
-  static float max_z(){ return _max_z; }
-  void        Init( const std::string& dev );
+  static float _max_x;
+  static float _max_y;
+  static float _max_z;
+  inline static float GetMaxX(){ return _max_x; }
+  inline static float GetMaxY(){ return _max_y; }
+  inline static float GetMaxZ(){ return _max_z; }
+  inline static void  SetMaxX( const float val ){ _max_x = val; }
+  inline static void  SetMaxY( const float val ){ _max_y = val; }
+  inline static void  SetMaxZ( const float val ){ _max_z = val; }
+
+
   std::string RunGcode( const std::string& gcode,
-                        const unsigned     attempt = 0,
-                        const unsigned     waitack = 1e4 ) const;
+                        const unsigned     waitack = 1e4,
+                        const unsigned     attempt = 0 ) const;
 
   // Motion command abstraction
   std::string GetSettings() const;
   void        SendHome( bool x, bool y, bool z );
   void        EnableStepper( bool x, bool y, bool z );
   void        DisableStepper( bool x, bool y, bool z );
-  bool        InMotion( float x, float y, float z );
   void        SetSpeedLimit( float x = std::nanf(""),
                              float y = std::nanf(""),
                              float z = std::nanf("") );
+
+  void clear_buffer() const;
 
   //
   void MoveTo( float x = std::nanf(""),
                float y = std::nanf(""),
                float z = std::nanf(""));
-
-  //
-  void MoveToRaw( float x = std::nanf(""),
-                  float y = std::nanf(""),
-                  float z = std::nanf(""));
+  bool UpdateCoordinate();
+  bool InMotion();
 
   // Floating point comparison.
-  static bool   MatchCoord( double x, double y );
-  static double ModifyTargetCoordinate( double orig, const double max );
+  static bool MatchCoord( float x, float y );
+  float       ModifyTargetCoordinate( float orig, const float max );
+
+  static inline float round_val( float x ){ return std::round( x * 10 ) / 10;}
 
   // Helper methods
-  int         printer_IO;
-  float       opx, opy, opz; /** target position of the printer */
-  float       cx, cy, cz; /** current position of the printer */
-  float       vx, vy, vz; /** Speed of the gantry head. */
-  std::string dev_path;
+  float opx, opy, opz; /** target position of the printer */
+  float cx, cy, cz;    /** current position of the printer */
+  float vx, vy, vz;    /** Speed of the gantry head. */
   // Constructor and destructor
-  GCoder();
+  GCoder( const std::string& dev_path );
+  GCoder()                 = delete;
   GCoder( const GCoder& )  = delete;
   GCoder( const GCoder&& ) = delete;
   ~GCoder();
 };
-
-static const std::string DeviceName = "GCoder";
 
 
 /**
@@ -101,9 +102,9 @@ static const std::string DeviceName = "GCoder";
  * hardware damaged.
  * @{
  */
-const float GCoder::_max_x = 345;
-const float GCoder::_max_y = 200;
-const float GCoder::_max_z = 460;
+float GCoder::_max_x = 345;
+float GCoder::_max_y = 200;
+float GCoder::_max_z = 460;
 
 /** @} */
 
@@ -128,37 +129,18 @@ static bool check_ack( const std::string& cmd, const std::string& msg );
  *
  * [s-port]: https://www.xanthium.in/Serial-Port-Programming-on-Linux
  */
-void
-GCoder::Init( const std::string& dev )
+GCoder::GCoder( const std::string& dev_path ) :  //
+  hw::fd_accessor( "GCoder", dev_path,
+                   O_RDWR | O_NOCTTY | O_NONBLOCK | O_ASYNC )
 {
   static const int speed = B115200;
 
   struct termios tty;
 
-  dev_path   = dev;
-  printer_IO = open( dev.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK | O_ASYNC );
-
-  if( printer_IO < 0 ){
-    throw device_exception( DeviceName,
-                            fmt::format(
-                              "Failed to open gcode device at path [%s]. returned code [%d]",
-                              dev,
-                              printer_IO ) );
-  }
-
-  int lock = flock( printer_IO, LOCK_EX | LOCK_NB );
-  if( lock ){
-    close( printer_IO );
-    printer_IO = -1;
-    throw device_exception( DeviceName,
-                            fmt::format( "Failed to lock path [%s]", dev ));
-  }
-
-  if( tcgetattr( printer_IO, &tty ) < 0 ){
-    throw device_exception( DeviceName,
-                            fmt::format(
-                              "Error getting termios settings. Returned code [%s]",
-                              strerror( errno ) ) );
+  if( tcgetattr( this->_fd, &tty ) < 0 ){
+    raise_error( fmt::format(
+                   "Error getting termios settings. Returned code [{0:s}]",
+                   strerror( errno ) ) );
   }
 
   cfsetospeed( &tty, (speed_t)speed );
@@ -181,15 +163,14 @@ GCoder::Init( const std::string& dev )
   tty.c_cc[VMIN]  = 0;
   tty.c_cc[VTIME] = 0;
 
-  if( tcsetattr( printer_IO, TCSANOW, &tty ) != 0 ){
-    throw device_exception( DeviceName,
-                            fmt::format(
-                              "Error setting termios. Returned code [%s]",
+  if( tcsetattr( this->_fd, TCSANOW, &tty ) != 0 ){
+    raise_error( fmt::format( "Error setting termios. Returned code [{0:s}]",
                               strerror( errno )) );
   }
 
-  printmsg( DeviceName, "Waking up printer...." );
-  hw::sleep_seconds( 1 );
+  printmsg( "Waking up printer...." );
+  hw::sleep_seconds( 10 );
+  clear_buffer(); // Flushing the buffer is required for first start up ()
   SendHome( true, true, true );
   hw::sleep_milliseconds( 5 );
 
@@ -197,7 +178,7 @@ GCoder::Init( const std::string& dev )
   SetSpeedLimit( 1000, 1000, 1000 );
 
   // Setting acceleration to 3x the factory default:
-  RunGcode( "M201 X1000 Y1000 Z300\n", 0, 1e5 );
+  RunGcode( "M201 X1000 Y1000 Z300", 1e5 );
 
   return;
 }
@@ -222,80 +203,55 @@ GCoder::Init( const std::string& dev )
  */
 std::string
 GCoder::RunGcode( const std::string& gcode,
-                  const unsigned     attempt,
-                  const unsigned     waitack ) const
+                  const unsigned     wait_ack,
+                  const unsigned     attempt ) const
 {
   using namespace std::chrono;
 
   // static variables
-  static const unsigned maxtry     = 10;
-  static const unsigned buffersize = 65536;
-
-  // Readout data
-  char        buffer[buffersize];
-  int         readlen;
-  std::string ackstr = "";
-  bool        awk    = false;
-
-  // Pretty output
-  std::string pstring = gcode;
-  pstring[pstring.length()-1] = '\0';// Getting rid of trailing new line
-
-  if( printer_IO < 0 ){
-    throw device_exception( DeviceName,
-                            "Printer is not available for commands" );
-  }
+  static const unsigned maxtry = 10;
 
   if( attempt >= maxtry ){
-    throw device_exception( DeviceName,
-                            fmt::format(
-                              R"(ACK string for command [%s] was not received
-                              after [%d] attempts! The message could be dropped
-                              or there is something wrong with the printer!)",
-                              pstring,
-                              maxtry ) );
+    raise_error(
+      fmt::format(
+        R"(ACK string for command [{0:s}] was not received after [{1:d}] attempts!
+        The message could be dropped or there is something wrong with the device!)",
+        gcode,
+        maxtry ) );
   }
 
   // Sending output
-  printdebug( DeviceName,
-              fmt::format( "[%s] to USBTERM[%d] (attempt %u)",
-                           pstring,
-                           dev_path,
+  printdebug( fmt::format( "[{0:s}] to USBTERM[{1:s}] (attempt {2:d})",
+                           gcode,
+                           this->_dev_path,
                            attempt ));
-  write( printer_IO, gcode.c_str(), gcode.length() );
-  tcdrain( printer_IO );
+  this->write( gcode+"\n" ); // Adding an end of string character
+  tcdrain( this->_fd );
 
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
-  high_resolution_clock::time_point t2 = high_resolution_clock::now();
+  high_resolution_clock::time_point start = high_resolution_clock::now();
 
-  // Checking the output for the acknowledge/completion return
-  do {
-    readlen = read( printer_IO, buffer, sizeof( buffer )-1 );
-
-    if( readlen > 0 ){
-      buffer[readlen] = 1;
-      ackstr          = std::string( buffer, buffer+readlen );
-      if( check_ack( gcode, ackstr ) ){
-        awk = true;
-      }
-    }
+  for( high_resolution_clock::time_point now = high_resolution_clock::now();
+       duration_cast<microseconds>( now-start ).count() < wait_ack;
+       now = high_resolution_clock::now() ){
     hw::sleep_milliseconds( 1 );
-    t2 = high_resolution_clock::now();
-  } while( !awk && duration_cast<microseconds>( t2-t1 ).count() < waitack );
+    const std::string ack_string = this->read_str();
 
-  // Checking output
-  if( awk ){
-    printdebug( DeviceName, fmt::format( "Request [%s] is done!", pstring ) );
-
-    // Flushing the printer buffer after executing the command.
-    while( readlen > 0 ){
-      readlen = read( printer_IO, buffer, sizeof( buffer )-1 );
-      hw::sleep_milliseconds( 5 );
+    if( check_ack( gcode, ack_string ) ){
+      printdebug( fmt::format( "Request [{0:s}] is done!", gcode ) );
+      clear_buffer();
+      return ack_string;
     }
+  }
+  return RunGcode( gcode, wait_ack, attempt+1 );
+}
 
-    return ackstr;
-  } else {
-    return RunGcode( gcode, attempt+1, waitack );
+
+void
+GCoder::clear_buffer() const
+{
+  // Flushing buffer by repeated read actions
+  for( unsigned n = 1; n > 0 ; n = this->read_str().length()){
+    hw::sleep_milliseconds( 5 );
   }
 }
 
@@ -317,6 +273,7 @@ GCoder::RunGcode( const std::string& gcode,
 static bool
 check_ack( const std::string& cmd, const std::string& msg )
 {
+  if( msg.length()  == 0 ){return false;}
   auto has_substr = []( const std::string& str, const std::string& sub )->bool {
                       return str.find( sub ) != std::string::npos;
                     };
@@ -339,34 +296,31 @@ check_ack( const std::string& cmd, const std::string& msg )
 void
 GCoder::SendHome( bool x, bool y, bool z )
 {
-  char cmd[80] = "G28";
+  std::string gcode = "G28";
 
   if( !x && !y && !z ){
     return;
   }
 
   if( x ){
-    strcat( cmd, " X" );
-    opx = 0;
-    cx  = 0;
+    gcode += " X";
+    opx    = 0;
+    cx     = 0;
   }
 
   if( y ){
-    strcat( cmd, " Y" );
-    opy = 0;
-    cy  = 0;
+    gcode += " Y";
+    opy    = 0;
+    cy     = 0;
   }
 
   if( z ){
-    strcat( cmd, " Z" );
-    opz = 0;
-    cz  = 0;
+    gcode += " Z";
+    opz    = 0;
+    cz     = 0;
   }
 
-  // Adding end of line character.
-  strcat( cmd, "\n" );
-
-  RunGcode( cmd, 0, 4e9 );
+  RunGcode( gcode, 4e9 );
 }
 
 
@@ -383,13 +337,13 @@ void
 GCoder::DisableStepper( bool x, bool y, bool z )
 {
   if( x ){
-    RunGcode( "M18 X E\n", 0, 1e5 );
+    RunGcode( "M18 X E", 1e5 );
   }
   if( y ){
-    RunGcode( "M18 Y E\n", 0, 1e5 );
+    RunGcode( "M18 Y E", 1e5 );
   }
   if( z ){
-    RunGcode( "M18 Z E\n", 0, 1e5 );
+    RunGcode( "M18 Z E", 1e5 );
   }
 }
 
@@ -404,13 +358,13 @@ void
 GCoder::EnableStepper( bool x, bool y, bool z )
 {
   if( x ){
-    RunGcode( "M17 X\n", 0, 1e5 );
+    RunGcode( "M17 X", 1e5 );
   }
   if( y ){
-    RunGcode( "M17 Y\n", 0, 1e5 );
+    RunGcode( "M17 Y", 1e5 );
   }
   if( z ){
-    RunGcode( "M17 Z\n", 0, 1e5 );
+    RunGcode( "M17 Z", 1e5 );
   }
 }
 
@@ -421,7 +375,7 @@ GCoder::EnableStepper( bool x, bool y, bool z )
 std::string
 GCoder::GetSettings() const
 {
-  return RunGcode( "M503\n" );
+  return RunGcode( "M503" );
 }
 
 
@@ -456,16 +410,10 @@ GCoder::SetSpeedLimit( float x, float y, float z )
   if( y > maxv ){ y = maxv; }
   if( z > maxv ){ z = maxz; }
 
-  RunGcode( fmt::format(
-              "M203 X%.2f Y%.2f Z%.2f\n",
-              x,
-              y,
-              z ),
-            0,
-            1e5 );
+  RunGcode( fmt::format( "M203 X{0:.2f} Y{1:.2f} Z{2:.2f}", x, y, z ), 1e5 );
 
   const float vmax = std::max( std::max( x, y ), z );
-  RunGcode( fmt::format( "G0 F%.2f\n", vmax * 60 ), 0, 1e5 );
+  RunGcode( fmt::format( "G0 F{0:.2f}", vmax * 60 ), 1e5 );
 
   vx = x;
   vy = y;
@@ -487,7 +435,7 @@ GCoder::SetSpeedLimit( float x, float y, float z )
  * additional parsing is required for make sure the motion has completed.
  */
 void
-GCoder::MoveToRaw( float x, float y, float z )
+GCoder::MoveTo( float x, float y, float z )
 {
   // Setting up target position
   opx = ( x == x ) ? x : opx;
@@ -495,14 +443,49 @@ GCoder::MoveToRaw( float x, float y, float z )
   opz = ( z == z ) ? z : opz;
 
   // Rounding to closest 0.1 (precision of gantry system)
-  opx = ModifyTargetCoordinate( opx, max_x() );
-  opy = ModifyTargetCoordinate( opy, max_y() );
-  opz = ModifyTargetCoordinate( opz, max_z() );
+  opx = ModifyTargetCoordinate( opx, GCoder::_max_x );
+  opy = ModifyTargetCoordinate( opy, GCoder::_max_y );
+  opz = ModifyTargetCoordinate( opz, GCoder::_max_z );
 
   // Running the code
-  RunGcode( fmt::format( "G0 X%.1f Y%.1f Z%.1f\n", opx, opy, opz ), 0, 1000 );
+  RunGcode( fmt::format( "G0 X{0:.1f} Y{1:.1f} Z{2:.1f}", opx, opy, opz ),
+            1000 );
 
   return;
+}
+
+
+/**
+ * @brief Extracting the current coordinates using the M114 gcode command
+ *
+ * Returns whether the string parsing is completed
+ */
+bool
+GCoder::UpdateCoordinate()
+{
+  float a, b, c, temp; // feed position of extruder.
+  float x, y, z;       // Temporary storage of the extract coordinates.
+  try {
+    const int check = sscanf(
+      RunGcode( "M114" ).c_str(),
+      "X:%f Y:%f Z:%f E:%f Count X:%f Y:%f Z:%f",
+      &a,
+      &b,
+      &c,
+      &temp,
+      &x,
+      &y,
+      &z );
+    if( check != 7 ){ return false; } // Early exit for bad parse
+    else {
+      cx = x;
+      cy = y;
+      cz = z;
+      return true;
+    }
+  } catch( std::exception& e ){ // Return false if command fails
+    return false;
+  }
 }
 
 
@@ -515,88 +498,16 @@ GCoder::MoveToRaw( float x, float y, float z )
  * rather than having the file interface suspend the thread while the gantry is
  * in motion, we opt to have the gantry perform simple one-off checks, and have
  * thread suspension be handled by the higher interfaces.
- *
- * The function will only return false (gantry has completed motion) if the
- * following condition is fulfilled:
- * - The coordinate checking code "M114" is correctly accepted and returned
- * - The return string of the "M114" is in the expected format.
- * - The target coordinates and the current coordinates match to within 0.1(mm)
- *
- * Anything else and the function will return True. Regardless of whether the
- * function returns true or false, the results of the M114 command will be used
- * to update the current gantry coordinates.
  */
 bool
-GCoder::InMotion( float x, float y, float z )
+GCoder::InMotion()
 {
-  std::string checkmsg;
-  float       a, b, c, temp;// feed position of extruder.
-  int         check;
-  try {
-    checkmsg = RunGcode( "M114\n" );
-    check    = sscanf(
-      checkmsg.c_str(),
-      "X:%f Y:%f Z:%f E:%f Count X:%f Y:%f Z:%f",
-      &a,
-      &b,
-      &c,
-      &temp,
-      &cx,
-      &cy,
-      &cz );
-  } catch( std::exception& e ){
+  if( UpdateCoordinate() ){
+    return !( MatchCoord( opx, cx ) //
+              && MatchCoord( opy, cy ) //
+              && MatchCoord( opz, cz ));
+  } else { // If updating coordinates failed. Assume the gantry is in motion
     return true;
-  }
-
-  if( check != 7 ){
-    return true;
-  }
-
-  // Supposedly the check matching coordinate
-  const double tx = ModifyTargetCoordinate( x, max_x() );
-  const double ty = ModifyTargetCoordinate( y, max_y() );
-  const double tz = ModifyTargetCoordinate( z, max_z() );
-
-  if( MatchCoord( tx, cx ) && MatchCoord( ty, cy ) && MatchCoord( tz, cz ) ){
-    return false;
-  } else {
-    return true;
-  }
-}
-
-
-/**
- * @brief Simple abstraction of the motion command to ensure motion safety.
- *
- * This motion command keeps the z coordinates above 3mm for as much as the
- * motion duration as possible. This help ensures that elements in the gantry
- * head does not impact the plate or the circuit board.
- */
-void
-GCoder::MoveTo( float x, float y, float z )
-{
-  static constexpr float min_z_safety = 3;
-
-  if( z < min_z_safety && opz < min_z_safety ){
-    MoveToRaw( opx, opy, min_z_safety );
-    hw::sleep_milliseconds( 10 );
-    MoveToRaw( x, y, min_z_safety );
-    hw::sleep_milliseconds( 10 );
-    MoveToRaw( x, y,  z );
-    hw::sleep_milliseconds( 10 );
-  } else if( opz < min_z_safety ){
-    MoveToRaw( opx, opy, min_z_safety );
-    hw::sleep_milliseconds( 10 );
-    MoveToRaw( x, y, z );
-    hw::sleep_milliseconds( 10 );
-  } else if( z < min_z_safety ){
-    MoveToRaw( x, y, min_z_safety );
-    hw::sleep_milliseconds( 10 );
-    MoveToRaw( x, y, z );
-    hw::sleep_milliseconds( 10 );
-  } else {
-    MoveToRaw( x, y, z );
-    hw::sleep_milliseconds( 10 );
   }
 }
 
@@ -606,12 +517,10 @@ GCoder::MoveTo( float x, float y, float z )
  * the gantry resolution of 0.1 mm
  */
 bool
-GCoder::MatchCoord( double x, double y )
+GCoder::MatchCoord( const float x, const float y )
 {
   // Rounding to closes 0.1
-  x = std::round( x * 10 ) / 10;
-  y = std::round( y * 10 ) / 10;
-  return x == y;
+  return GCoder::round_val( x ) == GCoder::round_val( y );
 }
 
 
@@ -631,42 +540,31 @@ GCoder::MatchCoord( double x, double y )
  * error message will be displayed to ensure notify the user of these
  * modifications.
  */
-double
-GCoder::ModifyTargetCoordinate( const double original, const double max_value )
+float
+GCoder::ModifyTargetCoordinate( const float original, const float max_value )
 {
-  auto rnd = []( double x ){ return std::round( x * 10 ) / 10;};
-
-  double ans = rnd( original ); // rounding to closest
+  float ans = GCoder::round_val( original ); // rounding to closest
   if( ans < 0.1 ){
-    printwarn( DeviceName,
-               fmt::format(
-                 R"(Target coordinate values [%.1lf] is below the lower limit 0.1.
+    printwarn( fmt::format(
+                 R"(Target coordinate values [{0:.1f}] is below the lower limit 0.1.
                  Modifying the target motion coordinate to 0.1 to avoid damaging
                  the system)",
                  ans ) );
     return 0.1;
   } else if( ans > max_value ){
-    printwarn( DeviceName,
-               fmt::format(
-                 R"(Target coordinate values [%.1lf] is above upper limit [%.1lf].
-                 Modifying the target motion coordinate to [%.1lf] to avoid damaging
-                 the system)",
+    printwarn( fmt::format(
+                 R"(Target coordinate values [{0:.1f}] is above upper limit
+                 [{1:.1f}]. Modifying the target motion coordinate to [{1:.1f}] to
+                 avoid damaging the system)",
                  ans,
-                 max_value,
                  max_value ));
 
-    return rnd( max_value );
+    return GCoder::round_val( max_value );
   } else {
     return ans;
   }
 }
 
-
-GCoder::GCoder() : printer_IO( -1 ),
-  opx                        ( -1 ),
-  opy                        ( -1 ),
-  opz                        ( -1 )
-{}
 
 /**
  * @brief Destructing the GCoder::GCoder object
@@ -676,50 +574,44 @@ GCoder::GCoder() : printer_IO( -1 ),
  */
 GCoder::~GCoder()
 {
-  printdebug( DeviceName, "Deallocating the gantry controls" );
-  if( printer_IO > 0 ){
-    close( printer_IO );
-  }
-  printdebug( DeviceName, "Gantry system closed" );
+  printdebug( "Deallocating the gantry controls" );
 }
-
-
-//**********************************************************
-//
-// Setting up the python bindings.
-//
-//***********************************************************
 
 
 PYBIND11_MODULE( gcoder, m )
 {
-  pybind11::class_<GCoder>( m, "GCoder" )
+  pybind11::class_<GCoder>( m, "gcoder" )
+  .def( pybind11::init<const std::string&>() )
 
-  // Explicitly hiding the constructor instance, using just the instance method
-  // for getting access to the singleton class.
-  .def( pybind11::init<>() )
-  .def( "init",            &GCoder::Init          )
-
-  // Hiding functions from python
+  // Operation-like functions
   .def( "run_gcode",       &GCoder::RunGcode       )
-  .def( "getsettings",     &GCoder::GetSettings    )
   .def( "set_speed_limit", &GCoder::SetSpeedLimit  )
-  .def( "moveto",          &GCoder::MoveTo         )
-  .def( "enablestepper",   &GCoder::EnableStepper  )
-  .def( "disablestepper",  &GCoder::DisableStepper )
-  .def( "in_motion",       &GCoder::InMotion       )
-  .def( "sendhome",        &GCoder::SendHome       )
-  .def_readwrite( "dev_path", &GCoder::dev_path )
-  .def_readwrite( "opx",      &GCoder::opx )
-  .def_readwrite( "opy",      &GCoder::opy )
-  .def_readwrite( "opz",      &GCoder::opz )
-  .def_readwrite( "cx",      &GCoder::cx )
-  .def_readwrite( "cy",      &GCoder::cy )
-  .def_readwrite( "cz",      &GCoder::cz )
+  .def( "move_to",         &GCoder::MoveTo         )
+  .def( "enable_stepper",  &GCoder::EnableStepper  )
+  .def( "disable_stepper", &GCoder::DisableStepper )
+  .def( "send_home",       &GCoder::SendHome       )
 
-  // Static methods
-  .def_static( "max_x", &GCoder::max_x )
-  .def_static( "max_y", &GCoder::max_y )
-  .def_static( "max_z", &GCoder::max_z )
+  // Read-like functions
+  .def( "get_settings", &GCoder::GetSettings    )
+  .def( "in_motion",    &GCoder::InMotion       )
+
+  // Read-like data members (Should only be set via operation-functions)
+  .def_readonly( "opx", &GCoder::opx )
+  .def_readonly( "opy", &GCoder::opy )
+  .def_readonly( "opz", &GCoder::opz )
+  .def_readonly( "cx",  &GCoder::cx  )
+  .def_readonly( "cy",  &GCoder::cy  )
+  .def_readonly( "cz",  &GCoder::cz  )
+  .def_readonly( "vx",  &GCoder::vx  )
+  .def_readonly( "vy",  &GCoder::vy  )
+  .def_readonly( "vz",  &GCoder::vz  )
+
+  // Static methods -- Explicit get/set pair
+  .def_static( "get_max_x", &GCoder::GetMaxX )
+  .def_static( "get_max_y", &GCoder::GetMaxY )
+  .def_static( "get_max_z", &GCoder::GetMaxZ )
+  .def_static( "set_max_x", &GCoder::SetMaxX )
+  .def_static( "set_max_y", &GCoder::SetMaxY )
+  .def_static( "set_max_z", &GCoder::SetMaxZ )
   ;
 }

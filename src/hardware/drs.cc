@@ -19,17 +19,23 @@
  * timeout for single shot mode once collection is requested, so the user will
  * be responsible for making sure that the appropriate trigger is provided.
  *
+ * Though devices are automatically detected via the libusb library, as handled
+ * by the upstream DRS software, for uniformity, we will still use the file
+ * descriptor class, and have the underlying file descriptor point to a lock
+ * file in the /tmp directory.
+ *
  * [ref]: https://www.psi.ch/en/drs/software-download
  */
 // Custom short hand directories
-#include "logger.hpp"
+#include "sysfs.hpp"
 #include "threadsleep.hpp"
 
 // DRS library
 #include "DRS.h"
 
 // Standard C++ libraries
-#include <fmt/printf.h>
+#include <fmt/core.h>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -38,7 +44,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-class DRSContainer
+class DRSContainer : private hw::fd_accessor
 {
 public:
   DRSContainer();
@@ -46,7 +52,6 @@ public:
   DRSContainer( const DRSContainer&& ) = delete;
   ~DRSContainer();
 
-  void Init();
   void StartCollect();
   void ForceStop();
 
@@ -99,9 +104,9 @@ private:
 
   std::vector<float> GetWaveFormRaw( const unsigned channel );
   std::vector<float> GetTimeArrayRaw( const unsigned channel );
-};
 
-static const std::string DeviceName = "DRSContainer";
+  static std::string make_lockfile();
+};
 
 
 /**
@@ -113,29 +118,28 @@ static const std::string DeviceName = "DRSContainer";
  * commented out to make sure future development doesn't open certain settings
  * that is already known to cause issues by accident.
  */
-void
-DRSContainer::Init()
+DRSContainer::DRSContainer() ://
+  hw::fd_accessor( "DRS", make_lockfile(), hw::fd_accessor::MODE::READ_WRITE ),
+  drs            ( nullptr ),
+  board          ( nullptr )
 {
-  printdebug( DeviceName, "Setting up DRS devices..." );
+  printdebug( "Setting up DRS devices..." );
   char str[256];
   drs = std::make_unique<DRS>();
   if( drs->GetError( str, sizeof( str ) ) ){
     drs = nullptr;
-    throw device_exception( DeviceName,
-                            fmt::format(
-                              "Error created DRS instance: %s",
-                              str ) );
+    raise_error( fmt::format( "Error created DRS instance: [{0:s}]", str ) );
   }
   if( !drs->GetNumberOfBoards() ){
-    throw device_exception( DeviceName, "No DRS boards found" );
+    drs = nullptr;
+    raise_error( "No DRS boards found" );
   }
 
   // Only getting the first board for now.
   board = drs->GetBoard( 0 );
   board->Init();
-  printdebug( DeviceName,
-              fmt::format(
-                "Found DRS[%d] board on USB, serial [%04d], firmware [%5d]\n",
+  printdebug( fmt::format(
+                "Found DRS[{0:d}] board on USB, serial [{1:04d}], firmware [{2:5d}]\n",
                 board->GetDRSType(),
                 board->GetBoardSerialNumber(),
                 board->GetFirmwareVersion() ));
@@ -164,7 +168,7 @@ DRSContainer::Init()
   // Additional sleep for configuration to get through.
   hw::sleep_microseconds( 5 );
 
-  printdebug( DeviceName, "Completed setting DRS Container" );
+  printdebug( "Completed setting DRS Container" );
 }
 
 
@@ -186,6 +190,16 @@ DRSContainer::WaitReady()
 }
 
 
+/**
+ * @brief Getting the time slice array for precision timing of a specific
+ * channel.
+ *
+ * Notice that this only changes once a timing calibration is performed, so it
+ * can be reused between calibration runs. However, it is found that the timing
+ * variation from a regular interval deducted from the sample frequency is small
+ * enough that this function is only included for the sake of debugging and
+ * display. The timing returned is in units of nanoseconds.
+ */
 std::vector<float>
 DRSContainer::GetTimeArrayRaw( const unsigned channel )
 {
@@ -199,13 +213,10 @@ DRSContainer::GetTimeArrayRaw( const unsigned channel )
 
 /**
  * @brief Getting the time slice array for precision timing of a specific
- * channel.
+ * channel. Casting to a numpy compatible array format.
  *
- * Notice that this only changes once a timing calibration is performed, so it
- * can be reused between calibration runs. However, it is found that the timing
- * variation from a regular interval deducted from the sample frequency is small
- * enough that this function is only included for the sake of debugging and
- * display. The timing returned is in units of nanoseconds.
+ * Here we also truncate the array according to the NSamples setting for the
+ * instance.
  */
 pybind11::array_t<float>
 DRSContainer::GetTimeArray( const unsigned channel )
@@ -213,23 +224,6 @@ DRSContainer::GetTimeArray( const unsigned channel )
   return pybind11::array_t<float>( //
     GetSamples(),
     GetTimeArrayRaw( channel ).data() );
-}
-
-
-std::vector<float>
-DRSContainer::GetWaveFormRaw( const unsigned channel )
-{
-  static const unsigned len = 2048;
-  float                 waveform[len];
-  WaitReady();
-
-  // Notice that channel index 0-1 both correspond to the the physical
-  // channel 1 input, and so on.
-  int status = board->GetWave( 0, channel * 2, waveform );
-  if( status ){
-    throw device_exception( DeviceName, "Error running DRSBoard::GetWave" );
-  }
-  return std::vector<float>( waveform, waveform+len );
 }
 
 
@@ -243,6 +237,29 @@ DRSContainer::GetWaveFormRaw( const unsigned channel )
  * Notice that this function will wait indefinitely for the board to finish
  * data collection. So the user is responsible for making sure that the
  * appropriate trigger signal is sent.
+ */
+std::vector<float>
+DRSContainer::GetWaveFormRaw( const unsigned channel )
+{
+  static const unsigned len = 2048;
+  float                 waveform[len];
+  WaitReady();
+
+  // Notice that channel index 0-1 both correspond to the the physical
+  // channel 1 input, and so on.
+  int status = board->GetWave( 0, channel * 2, waveform );
+  if( status ){
+    raise_error( "Error running DRSBoard::GetWave" );
+  }
+  return std::vector<float>( waveform, waveform+len );
+}
+
+
+/**
+ * @brief Returning the last collected waveform as an array of floats, casting
+ * to a numpy compatible array format.
+ *
+ * We also truncate the array to the n-sample setting.
  */
 pybind11::array_t<float>
 DRSContainer::GetWaveform( const unsigned channel )
@@ -298,31 +315,6 @@ DRSContainer::WaveformSum( const unsigned channel,
   ans -= pedvalue * ( intstop-intstart );
   ans *= -timeslice;// Negative to correct pulse direction
   return ans;
-}
-
-
-/**
- * @brief Printing the latest buffer collection results on the screen for
- * debugging.
- *
- * This will be the only time where the timing results will be displayed. The
- * waveform summation will not use the timing information. Also, as this is
- * strictly meant for runtime debugging, the output will not use the common
- * logging output.
- */
-void
-DRSContainer::DumpBuffer( const unsigned channel )
-{
-  const auto     waveform     = GetWaveFormRaw( channel );
-  const auto     time_array   = GetTimeArrayRaw( channel );
-  const unsigned length       = GetSamples();
-  std::string    output_table = "";
-  output_table += fmt::sprintf( "%s | Channel%d | [mV]\n", "Time", channel );
-  for( unsigned i = 0; i < length; ++i ){
-    output_table +=
-      fmt::sprintf( "%.3lf | %.2lf\n", time_array[i], waveform[i] );
-  }
-  printdebug( DeviceName, output_table );
 }
 
 
@@ -415,8 +407,6 @@ DRSContainer::SetRate( const double x )
 
 /**
  * @brief Getting the true sampling rate
- *
- * @return double
  */
 double
 DRSContainer::GetRate()
@@ -478,7 +468,7 @@ void
 DRSContainer::CheckAvailable() const
 {
   if( !IsAvailable() ){
-    throw device_exception( DeviceName, "DRS4 board is not available" );
+    raise_error( "DRS4 board is not available" );
   }
 }
 
@@ -504,12 +494,10 @@ DRSContainer::IsReady()
 
 
 /**
- * @brief Simple wrapper function for running the calibration at the current
- * settings.
+ * @brief Running the timing calibration.
  *
  * This C++ function will assume that the DRS is in a correct configuration to
- * be calibrated (all inputs disconnected). Additional user instructions will
- * be handled by the python part.
+ * be calibrated (all inputs disconnected).
  */
 void
 DRSContainer::RunCalib()
@@ -539,42 +527,61 @@ public:
 }
 
 
-DRSContainer::DRSContainer() : board( nullptr ){}
+/**
+ * @brief Simple method for creating the lock file in the /tmp directory.
+ */
+std::string
+DRSContainer::make_lockfile()
+{
+  const std::string filename = "/tmp/drs.lock";
+
+  // Checking if the lock file actually exists. Creating if not.
+  std::fstream lock_fs;
+  lock_fs.open( filename,
+                std::fstream::in | std::fstream::out | std::fstream::app );
+
+  if( !lock_fs ){
+    lock_fs.open( filename,
+                  std::fstream::in | std::fstream::out | std::fstream::trunc );
+  }
+  lock_fs.close();
+
+  return filename;
+}
+
 
 DRSContainer::~DRSContainer()
 {
-  printdebug( DeviceName, "Deallocating the DRS controller" );
+  printdebug( "Deallocating the DRS controller" );
 }
 
 
 PYBIND11_MODULE( drs, m )
 {
   pybind11::class_<DRSContainer>( m, "drs" )
-
-  // Special singleton syntax, do *NOT* define the __init__ method
   .def( pybind11::init<>() )
-  .def( "init",              &DRSContainer::Init )
-  .def( "timeslice",         &DRSContainer::GetTimeArray )
-  .def( "startcollect",      &DRSContainer::StartCollect )
-  .def( "forcestop",         &DRSContainer::ForceStop )
 
-  // Trigger related stuff
-  .def( "set_trigger",       &DRSContainer::SetTrigger )
-  .def( "trigger_channel",   &DRSContainer::TriggerChannel )
-  .def( "trigger_direction", &DRSContainer::TriggerDirection )
-  .def( "trigger_level",     &DRSContainer::TriggerLevel )
-  .def( "trigger_delay",     &DRSContainer::TriggerDelay )
+  // Operation functions
+  .def( "force_stop",      &DRSContainer::ForceStop    )
+  .def( "start_collect",   &DRSContainer::StartCollect )
+  .def( "run_calibration", &DRSContainer::RunCalib     )
+  .def( "set_trigger",     &DRSContainer::SetTrigger   )
+  .def( "set_samples",     &DRSContainer::SetSamples   )
+  .def( "set_rate",        &DRSContainer::SetRate      )
 
-  // Collection related stuff
-  .def( "set_samples",       &DRSContainer::SetSamples )
-  .def( "samples",           &DRSContainer::GetSamples )
-  .def( "set_rate",          &DRSContainer::SetRate )
-  .def( "rate",              &DRSContainer::GetRate )
+  // Data extraction function (operation-like)
+  .def( "get_time_slice",  &DRSContainer::GetTimeArray )
+  .def( "get_waveform",    &DRSContainer::GetWaveform  )
+  .def( "get_waveformsum", &DRSContainer::WaveformSum  )
 
-  .def( "is_available",      &DRSContainer::IsAvailable )
-  .def( "is_ready",          &DRSContainer::IsReady )
-  .def( "waveformsum",       &DRSContainer::WaveformSum )
-  .def( "dumpbuffer",        &DRSContainer::DumpBuffer )
-  .def( "run_calibrations",  &DRSContainer::RunCalib   )
+  // Getting configurations (read-only operations)
+  .def( "get_trigger_channel",   &DRSContainer::TriggerChannel   )
+  .def( "get_trigger_direction", &DRSContainer::TriggerDirection )
+  .def( "get_trigger_level",     &DRSContainer::TriggerLevel     )
+  .def( "get_trigger_delay",     &DRSContainer::TriggerDelay     )
+  .def( "get_samples",           &DRSContainer::GetSamples       )
+  .def( "get_rate",              &DRSContainer::GetRate          )
+  .def( "is_available",          &DRSContainer::IsAvailable      )
+  .def( "is_ready",              &DRSContainer::IsReady          )
   ;
 }
