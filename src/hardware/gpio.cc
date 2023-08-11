@@ -6,6 +6,13 @@
 // Pybind11
 #include <pybind11/pybind11.h>
 
+/**
+ * @brief Wrapper for a working with the GPIO pins.
+ *
+ * @details GPIO must be defined via a BCM pin index, which is different from
+ * the physical bin layout. You can find the pin mapping using the wiringPi's
+ * `gpio readall` command.
+ */
 class gpio : private hw::fd_accessor
 {
 private:
@@ -31,26 +38,26 @@ public:
                                        const int     direction );
 };
 
-
+/**
+ * @brief Opening the GPIO file descriptor for interacting with the GPIO pin of
+ * interest.
+ *
+ * @details The user will need to specify the BCM pin index and the read/write
+ * direction. As there are additional routines required to have the GPIO file
+ * descriptors to be enabled in the system, those routines are define in the
+ * make_device_name method. If this pre-routine fails, a exception will be
+ * raised, and the primary file descriptor will never be initialized.
+ */
 gpio::gpio( const uint8_t pin_idx, const int direction ) :      //
-  // Getting the required descriptor files initialized befor actually opening
-  // the primary file descriptor.
   hw::fd_accessor( gpio::make_device_name( pin_idx, direction ),
                    fmt::format( "/sys/class/gpio/gpio{0:d}/value", pin_idx ),  //
                    direction ),
   _pin_idx       ( pin_idx )
 {}
 
-
-gpio::~gpio()
-{
-  hw::fd_accessor( "GPIO_unexport",
-                   "/sys/class/gpio/unexport",
-                   hw::fd_accessor::MODE::WRITE_ONLY )
-  .write( fmt::format( "{0:d}", this->_pin_idx ));
-}
-
-
+/**
+ * @brief Static method of enabling a pin to be used.
+ */
 std::string
 gpio::make_device_name( const uint8_t pin_idx, const int direction )
 {
@@ -75,6 +82,23 @@ gpio::make_device_name( const uint8_t pin_idx, const int direction )
 }
 
 
+/**
+ * @brief Additional routine needs to deallocate the the system resources of the
+ * GPIO pin.
+ */
+gpio::~gpio()
+{
+  hw::fd_accessor( "GPIO_unexport",
+                   "/sys/class/gpio/unexport",
+                   hw::fd_accessor::MODE::WRITE_ONLY )
+  .write( fmt::format( "{0:d}", this->_pin_idx ));
+}
+
+
+/**
+ * @brief Slow write operation to toggle the pin value. Run all typically write
+ * checks. And raises exception checks fail.
+ */
 void
 gpio::slow_write( const bool x ) const
 {
@@ -82,6 +106,10 @@ gpio::slow_write( const bool x ) const
 }
 
 
+/**
+ * @brief Slow read operation to check for current voltage value. Run all
+ * typical read checks and raises exception if checks fail.
+ */
 bool
 gpio::slow_read() const
 {
@@ -90,7 +118,8 @@ gpio::slow_read() const
 
 
 /**
- * @brief Generating N pulses with some time in between pulses.
+ * @brief Generating N pulses with some time in between pulses. Only 1 validity
+ * check will performed at the start of the function call.
  *
  * All pulses will have a high-time of 1 microsecond, and a w microsecond of
  * down time. The fastest pulse rate is about 100 microseconds.
@@ -111,15 +140,14 @@ gpio::pulse( const unsigned n, const unsigned wait ) const
 PYBIND11_MODULE( gpio, m )
 {
   pybind11::class_<gpio>( m, "gpio" )
-
-  // Explicitly hiding the constructor instance, using just the instance method
-  // for getting access to the singleton class.
   .def( pybind11::init<const uint8_t, const int>() )
 
-  // Hiding functions from python
-  .def( "slow_write",      &gpio::slow_write     )
-  .def( "slow_read",       &gpio::slow_read      )
-  .def( "pulse",           &gpio::pulse          )
+  // Command-like function calls
+  .def( "slow_write", &gpio::slow_write )
+  .def( "pulse", &gpio::pulse, pybind11::arg( "n" ), pybind11::arg( "wait" ) )
+
+  // Read-only function calls.
+  .def( "slow_read", &gpio::slow_read )
 
   .def_readonly_static( "READ",  &gpio::READ )
   .def_readonly_static( "WRITE", &gpio::WRITE )
