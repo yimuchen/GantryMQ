@@ -1,3 +1,7 @@
+# Editing related files
+.vscode/
+
+
 # Build related files
 build/
 CMakeFiles/
