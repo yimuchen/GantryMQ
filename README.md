@@ -61,11 +61,11 @@ need to install the following software requirements:
 - `pybind11` and python headers: for exposing C++ code to python
 - `fmt`: a standardized C++ formatting library
 - `wxWidget`, `libusb`: for interfacing with the DRS4 headless oscilloscope.
-- `python-opencv`: for interfacing with the webcam
+- `python-pika`: for the rabbit-MQ system used for client-server communication.
 
 ### Installing the Server software
 
-This can be done with direct copy and paste
+This can be done with direct command copy and paste:
 
 ```bash
 git clone https://github.com/UMDCMS/GantryMQ.git
@@ -75,7 +75,11 @@ cmake ./
 cmake --build ./
 ```
 
-This would setup all the environment for running the server.
+This would set up all the environment for running the server.
+
+### Testing hardware interactions locally on the server
+
+TBD
 
 ### Starting the server software
 
