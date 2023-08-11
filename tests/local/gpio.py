@@ -3,7 +3,6 @@ from modules.gpio import gpio
 
 logging.basicConfig(level=20)
 logger = logging.getLogger('GantryMQ')
-logger.setLevel(6)
 
 print("""
 Expected behavior:
