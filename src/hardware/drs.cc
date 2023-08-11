@@ -319,32 +319,6 @@ DRSContainer::WaveformSum( const unsigned channel,
 
 
 /**
- * @brief Printing the latest buffer collection results on the screen for
- * debugging.
- *
- * This will be the only time where the timing results will be displayed. The
- * waveform summation will not use the timing information. Also, as this is
- * strictly meant for runtime debugging, the output will not use the common
- * logging output.
- */
-void
-DRSContainer::DumpBuffer( const unsigned channel )
-{
-  const auto     waveform     = GetWaveFormRaw( channel );
-  const auto     time_array   = GetTimeArrayRaw( channel );
-  const unsigned length       = GetSamples();
-  std::string    output_table = "";
-  output_table +=
-    fmt::format( "{0:s} | Channel{1:d} | [mV]\n", "Time", channel );
-  for( unsigned i = 0; i < length; ++i ){
-    output_table +=
-      fmt::format( "{0:.3f} | {1:.2f}\n", time_array[i], waveform[i] );
-  }
-  printdebug( output_table );
-}
-
-
-/**
  * @brief Setting the trigger
  *
  * For the channel, use 4 to set to external trigger. The level and direction
@@ -552,8 +526,9 @@ public:
               TriggerDelay() );// 0 nanosecond delay by default.
 }
 
+
 /**
- * @brief Simple method for setting the lock file.
+ * @brief Simple method for creating the lock file in the /tmp directory.
  */
 std::string
 DRSContainer::make_lockfile()
@@ -584,30 +559,29 @@ DRSContainer::~DRSContainer()
 PYBIND11_MODULE( drs, m )
 {
   pybind11::class_<DRSContainer>( m, "drs" )
-
-  // Special singleton syntax, do *NOT* define the __init__ method
   .def( pybind11::init<>() )
-  .def( "timeslice",         &DRSContainer::GetTimeArray )
-  .def( "startcollect",      &DRSContainer::StartCollect )
-  .def( "forcestop",         &DRSContainer::ForceStop )
 
-  // Trigger related stuff
-  .def( "set_trigger",       &DRSContainer::SetTrigger )
-  .def( "trigger_channel",   &DRSContainer::TriggerChannel )
-  .def( "trigger_direction", &DRSContainer::TriggerDirection )
-  .def( "trigger_level",     &DRSContainer::TriggerLevel )
-  .def( "trigger_delay",     &DRSContainer::TriggerDelay )
+  // Operation functions
+  .def( "force_stop",      &DRSContainer::ForceStop    )
+  .def( "start_collect",   &DRSContainer::StartCollect )
+  .def( "run_calibration", &DRSContainer::RunCalib     )
+  .def( "set_trigger",     &DRSContainer::SetTrigger   )
+  .def( "set_samples",     &DRSContainer::SetSamples   )
+  .def( "set_rate",        &DRSContainer::SetRate      )
 
-  // Collection related stuff
-  .def( "set_samples",       &DRSContainer::SetSamples )
-  .def( "samples",           &DRSContainer::GetSamples )
-  .def( "set_rate",          &DRSContainer::SetRate )
-  .def( "rate",              &DRSContainer::GetRate )
+  // Data extraction function (operation-like)
+  .def( "get_time_slice",  &DRSContainer::GetTimeArray )
+  .def( "get_waveform",    &DRSContainer::GetWaveform  )
+  .def( "get_waveformsum", &DRSContainer::WaveformSum  )
 
-  .def( "is_available",      &DRSContainer::IsAvailable )
-  .def( "is_ready",          &DRSContainer::IsReady )
-  .def( "waveformsum",       &DRSContainer::WaveformSum )
-  .def( "dumpbuffer",        &DRSContainer::DumpBuffer )
-  .def( "run_calibrations",  &DRSContainer::RunCalib   )
+  // Getting configurations (read-only operations)
+  .def( "get_trigger_channel",   &DRSContainer::TriggerChannel   )
+  .def( "get_trigger_direction", &DRSContainer::TriggerDirection )
+  .def( "get_trigger_level",     &DRSContainer::TriggerLevel     )
+  .def( "get_trigger_delay",     &DRSContainer::TriggerDelay     )
+  .def( "get_samples",           &DRSContainer::GetSamples       )
+  .def( "get_rate",              &DRSContainer::GetRate          )
+  .def( "is_available",          &DRSContainer::IsAvailable      )
+  .def( "is_ready",              &DRSContainer::IsReady          )
   ;
 }
