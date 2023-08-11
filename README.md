@@ -77,9 +77,19 @@ cmake --build ./
 
 This would set up all the environment for running the server.
 
-### Testing hardware interactions locally on the server
+### Testing hardware interactions locally on the server machine
 
-TBD
+Once the server-side software is installed, we can test the hardware interaction
+on the server machine to make sure everything is working nominally on the server
+side.
+
+```python
+cd GantryMQ # Tests are not intended to be ran anywhere else other than the project directory
+export PYTHONPATH=$PYTHONPATH:$PWD
+python tests/local/gcoder.py # Testing gcoder
+python tests/local/gpio.py   # Testing GPIO interactions
+python tests/local/i2c_ads1115.py # Testing the I2C ADC interaction
+```
 
 ### Starting the server software
 

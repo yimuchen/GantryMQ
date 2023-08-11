@@ -569,11 +569,16 @@ GCoder::ModifyTargetCoordinate( const float original, const float max_value )
 /**
  * @brief Destructing the GCoder::GCoder object
  *
- * Intensionally adding a verbose system such that the user can debug issue
- * during shutdown.
+ * Attempt to move close to the home position before deallocating (faster start
+ * up for the next startup instance).
  */
 GCoder::~GCoder()
 {
+  try {
+    this->MoveTo( 1, 1, 1 ); // 1 mm away from home
+  } catch( std::exception& err ){
+    // Do nothing if something errors out.
+  }
   printdebug( "Deallocating the gantry controls" );
 }
 
