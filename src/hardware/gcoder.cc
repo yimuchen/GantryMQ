@@ -43,12 +43,17 @@
 class GCoder : private hw::fd_accessor
 {
 public:
-  static const float _max_x;
-  static const float _max_y;
-  static const float _max_z;
-  static float max_x(){ return _max_x; }
-  static float max_y(){ return _max_y; }
-  static float max_z(){ return _max_z; }
+  static float _max_x;
+  static float _max_y;
+  static float _max_z;
+  inline static float GetMaxX(){ return _max_x; }
+  inline static float GetMaxY(){ return _max_y; }
+  inline static float GetMaxZ(){ return _max_z; }
+  inline static void  SetMaxX( const float val ){ _max_x = val; }
+  inline static void  SetMaxY( const float val ){ _max_y = val; }
+  inline static void  SetMaxZ( const float val ){ _max_z = val; }
+
+
   std::string RunGcode( const std::string& gcode,
                         const unsigned     waitack = 1e4,
                         const unsigned     attempt = 0 ) const;
@@ -97,9 +102,9 @@ public:
  * hardware damaged.
  * @{
  */
-const float GCoder::_max_x = 345;
-const float GCoder::_max_y = 200;
-const float GCoder::_max_z = 460;
+float GCoder::_max_x = 345;
+float GCoder::_max_y = 200;
+float GCoder::_max_z = 460;
 
 /** @} */
 
@@ -438,9 +443,9 @@ GCoder::MoveTo( float x, float y, float z )
   opz = ( z == z ) ? z : opz;
 
   // Rounding to closest 0.1 (precision of gantry system)
-  opx = ModifyTargetCoordinate( opx, max_x() );
-  opy = ModifyTargetCoordinate( opy, max_y() );
-  opz = ModifyTargetCoordinate( opz, max_z() );
+  opx = ModifyTargetCoordinate( opx, GCoder::_max_x );
+  opy = ModifyTargetCoordinate( opy, GCoder::_max_y );
+  opz = ModifyTargetCoordinate( opz, GCoder::_max_z );
 
   // Running the code
   RunGcode( fmt::format( "G0 X{0:.1f} Y{1:.1f} Z{2:.1f}", opx, opy, opz ),
@@ -493,16 +498,6 @@ GCoder::UpdateCoordinate()
  * rather than having the file interface suspend the thread while the gantry is
  * in motion, we opt to have the gantry perform simple one-off checks, and have
  * thread suspension be handled by the higher interfaces.
- *
- * The function will only return false (gantry has completed motion) if the
- * following condition is fulfilled:
- * - The coordinate checking code "M114" is correctly accepted and returned
- * - The return string of the "M114" is in the expected format.
- * - The target coordinates and the current coordinates match to within 0.1(mm)
- *
- * Anything else and the function will return True. Regardless of whether the
- * function returns true or false, the results of the M114 command will be used
- * to update the current gantry coordinates.
  */
 bool
 GCoder::InMotion()
@@ -583,42 +578,40 @@ GCoder::~GCoder()
 }
 
 
-//**********************************************************
-//
-// Setting up the python bindings.
-//
-//***********************************************************
-
-
 PYBIND11_MODULE( gcoder, m )
 {
   pybind11::class_<GCoder>( m, "gcoder" )
-
-  // Explicitly hiding the constructor instance, using just the instance method
-  // for getting access to the singleton class.
   .def( pybind11::init<const std::string&>() )
 
-  // Exposing function to python
+  // Operation-like functions
   .def( "run_gcode",       &GCoder::RunGcode       )
-  .def( "getsettings",     &GCoder::GetSettings    )
   .def( "set_speed_limit", &GCoder::SetSpeedLimit  )
-  .def( "moveto",          &GCoder::MoveTo         )
-  .def( "enablestepper",   &GCoder::EnableStepper  )
-  .def( "disablestepper",  &GCoder::DisableStepper )
-  .def( "in_motion",       &GCoder::InMotion       )
-  .def( "sendhome",        &GCoder::SendHome       )
+  .def( "move_to",         &GCoder::MoveTo         )
+  .def( "enable_stepper",  &GCoder::EnableStepper  )
+  .def( "disable_stepper", &GCoder::DisableStepper )
+  .def( "send_home",       &GCoder::SendHome       )
 
-  //.def_readwrite( "dev_path", &GCoder::dev_path )
-  .def_readwrite( "opx",      &GCoder::opx )
-  .def_readwrite( "opy",      &GCoder::opy )
-  .def_readwrite( "opz",      &GCoder::opz )
-  .def_readwrite( "cx",      &GCoder::cx )
-  .def_readwrite( "cy",      &GCoder::cy )
-  .def_readwrite( "cz",      &GCoder::cz )
+  // Read-like functions
+  .def( "get_settings", &GCoder::GetSettings    )
+  .def( "in_motion",    &GCoder::InMotion       )
 
-  // Static methods
-  .def_static( "max_x", &GCoder::max_x )
-  .def_static( "max_y", &GCoder::max_y )
-  .def_static( "max_z", &GCoder::max_z )
+  // Read-like data members (Should only be set via operation-functions)
+  .def_readonly( "opx", &GCoder::opx )
+  .def_readonly( "opy", &GCoder::opy )
+  .def_readonly( "opz", &GCoder::opz )
+  .def_readonly( "cx",  &GCoder::cx  )
+  .def_readonly( "cy",  &GCoder::cy  )
+  .def_readonly( "cz",  &GCoder::cz  )
+  .def_readonly( "vx",  &GCoder::vx  )
+  .def_readonly( "vy",  &GCoder::vy  )
+  .def_readonly( "vz",  &GCoder::vz  )
+
+  // Static methods -- Explicit get/set pair
+  .def_static( "get_max_x", &GCoder::GetMaxX )
+  .def_static( "get_max_y", &GCoder::GetMaxY )
+  .def_static( "get_max_z", &GCoder::GetMaxZ )
+  .def_static( "set_max_x", &GCoder::SetMaxX )
+  .def_static( "set_max_y", &GCoder::SetMaxY )
+  .def_static( "set_max_z", &GCoder::SetMaxZ )
   ;
 }
