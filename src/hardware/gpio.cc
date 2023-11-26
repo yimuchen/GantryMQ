@@ -70,8 +70,7 @@ gpio::make_device_name( const uint8_t pin_idx, const int direction )
 
   // Getting the direction path
   const std::string dir_path = fmt::format(
-    "/sys/class/gpio/gpio{0:d}/direction",
-    pin_idx );
+    "/sys/class/gpio/gpio{0:d}/direction", pin_idx );
 
   hw::fd_accessor::wait_fd_access( dir_path );
   hw::sleep_milliseconds( 100 );
