@@ -5,6 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "gqmclient"
 authors = [{ name = "Yi-Mu Chen", email = "yimuchen@umd.edu" }]
+dependencies = ["opencv-python", "pyzmq", "scipy"]
 dynamic = ["version"]
 
 ### The following is for the construction of the package using hatchling
