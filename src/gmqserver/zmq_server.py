@@ -112,6 +112,7 @@ class HWControlServer:
                 function = request["function_name"]
                 args = request["args"]
                 kwargs = request["kwargs"]
+                self.logger.info(request)
 
                 # Running the registerd functions
                 # Special methods that required direct calls to lock server flags:

@@ -1,0 +1,6 @@
+{
+  "HV_ENABLE_GPIO": "27",
+  "HVLV_ADC_ADDR": "0x48",
+  "HV_DAC_ADDR": "0x65",
+  "LV_DAC_ADDR": "0x64"
+}

@@ -7,10 +7,10 @@ import numpy
 
 def reset_drs_device(logger: logging.Logger, hw: HWContainer):
     """Resetting the DRS device"""
-    if not hasattr(hw, drs_device):
+    if not hasattr(hw, "drs_device"):
         hw.drs_device = None
 
-    hw.drs_device = drs.drs()
+    hw.drs_device = drs()
 
 
 def create_drs_passthrough(method_name: str) -> None:

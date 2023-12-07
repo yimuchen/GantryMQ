@@ -2,6 +2,7 @@
 from typing import Tuple, Dict, List
 
 import logging
+import time
 
 
 # Basic methods for accessing the various methods
@@ -37,19 +38,34 @@ def register_method_for_client(cls):
 
 if __name__ == "__main__":
     from zmq_client import HWControlClient
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        "gcoder_methods.py", "Simple test program to for interacting with gcoder device"
+    )
+    parser.add_argument(
+        "--serverip", type=str, required=True, help="IP of device controlling printer"
+    )
+    parser.add_argument(
+        "--serverport", type=int, default=8989, help="IP of device controlling printer"
+    )
+    parser.add_argument(
+        "--devpath", type=str, default="/dev/ttyUSB0", help="device path at server"
+    )
+    args = parser.parse_args()
 
     # Adding the additional methods
     register_method_for_client(HWControlClient)
 
     logging.root.setLevel(1)
     logging.basicConfig(level=logging.NOTSET)
-    client = HWControlClient("localhost", 8989)
+    client = HWControlClient(args.serverip, args.serverport)
 
     # Testing the gantry controls
     client.claim_operator()
-    client.reset_gcoder_device("/dev/dummy")
+    # client.reset_gcoder_device(args.devpath)
     print(client.get_coord())
-    client.send_home(x=True, y=True, z=True)
+    #client.send_home(x=True, y=True, z=True)
     print(client.get_coord())
-    client.move_to(x=100, y=200, z=200)
+    client.move_to(x=11, y=12, z=13)
     print(client.get_coord())

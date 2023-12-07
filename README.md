@@ -66,13 +66,17 @@ Notice that you will need to reload the Python virtual environment every time.
 
 Once the server-side software is installed, we can test the hardware interaction
 on the server machine to make sure everything is working nominally on the server
-side. The following commands will likely not work in the docker session
+side. The following commands will likely not work in the docker session. The
+commands here also assume that you have access to the various hardware
+interfaces. You may also need to modify the access addresses and pins to match
+whatever hardware is attached to your system.
 
 ```python
 cd GantryMQ # Tests are not intended to be ran anywhere else other than the project directory
-PYTHONPATH=$PYTHONPATH:$PWD python tests/gcoder.py # Testing gcoder
-PYTHONPATH=$PYTHONPATH:$PWD python tests/gpio.py   # Testing GPIO interactions
-PYTHONPATH=$PYTHONPATH:$PWD python tests/i2c_ads1115.py # Testing the I2C ADC interaction
+PYTHONPATH=$PYTHONPATH:$PWD python tests/hardware/gcoder.py # Testing gcoder
+PYTHONPATH=$PYTHONPATH:$PWD python tests/hardware/gpio.py   # Testing GPIO interactions
+PYTHONPATH=$PYTHONPATH:$PWD python tests/hardware/i2c_ads1115.py # Testing the I2C ADC interaction
+PYTHONPATH=$PYTHONPATH:$PWD python tests/hardware/i2c_mcp4725.py # Testing the I2C DAC interaction
 ```
 
 ### Testing with server-client interactions
@@ -96,9 +100,8 @@ python src/gmqclient/zmq_client.py
 
 #### Testing the various control systems
 
-Currently implemented systems include `gcoder`, `camera`, `digi`, and `drs`. If
-you are testing on your machine, various hardware interfaces may not be
-available.
+Currently implemented systems include `gcoder`, `camera`, and `drs`. If you are
+testing on your machine, various hardware interfaces may not be available.
 
 ```bash
 # Server-side
@@ -106,3 +109,7 @@ python src/gmqserver/${system}_methods.py
 # Client-side
 python src/gmqclient/${system}_methods.py --help
 ```
+
+For other interactions, because interactions with the ICs on the auxiliary
+helper boards need to be set up according to the required specs, consult the
+documentation found in the [`\_doc`](_doc) folder for detailed instructions.

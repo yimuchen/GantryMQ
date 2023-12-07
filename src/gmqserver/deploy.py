@@ -1,4 +1,3 @@
-# Do nothing for now
 import sys
 import os
 
@@ -26,7 +25,9 @@ def create_default_devices(**kwargs):
     gcoder_methods.reset_gcoder_device(
         None, hw, dev_path=kwargs.get("gcoder_device", "/dev/ttyUSB0")
     )
-    drs_methods.reset_drs_device(None, hw)
+
+    if kwargs["drs"]:
+        drs_methods.reset_drs_device(None, hw)
 
     return hw
 
@@ -61,8 +62,32 @@ def create_default_server(
 
 
 if __name__ == "__main__":
-    hw = create_default_devices()
-    server = create_default_devices(
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        "deploy.py", "Setting up server with the required hardware"
+    )
+    parser.add_argument(
+        "--camera_device",
+        type=str,
+        default="/dev/video0",
+        help="Path to camera device to use",
+    )
+    parser.add_argument(
+        "--gcoder_device",
+        type=str,
+        default="/dev/ttyUSB0",
+        help="Path to the USB device that accepts gocde instructions",
+    )
+    parser.add_argument(
+        "--drs",
+        action="store_true",
+        help="Whether or not to initialize a DRS readout setting",
+    )
+    args = parser.parse_args()
+
+    hw = create_default_devices(**args.__dict__)
+    server = create_default_server(
         hw=hw, logger=logging.getLogger("gmqserver@default"), port=8989
     )
 

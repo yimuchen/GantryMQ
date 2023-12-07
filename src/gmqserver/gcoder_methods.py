@@ -149,6 +149,7 @@ if __name__ == "__main__":
         telemetry_cmds=_gcoder_telemetry_cmds_,
         operation_cmds=_gcoder_operation_cmds_,
     )
+    reset_gcoder_device(server.logger, server.hw, "/dev/ttyUSB0")
 
     # Running the server
     server.run_server()

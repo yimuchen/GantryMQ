@@ -1,0 +1,12 @@
+{
+  "SENAUX_PD1_GPIO": "22",
+  "SENAUX_PD2_GPIO": "23",
+  "SENAUX_F1_GPIO": "20",
+  "SENAUX_F2_GPIO": "21",
+  "SENAUX_ADC": {
+    "ADDR": "0x4a",
+    "C1": [10000, 0],
+    "C2": [10000, 0],
+    "C3": [10000, 0]
+  }
+}

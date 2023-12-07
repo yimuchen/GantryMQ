@@ -16,9 +16,8 @@ from .zmq_client import HWControlClient
 from . import camera_methods
 from . import gcoder_methods
 from . import drs_methods
-
-# from . import pdf
-
+from . import HVLV_methods
+from . import SenAUX_methods
 
 # Function for creating the default client with all method loaded
 def create_default_client(host: str = "localhost", port: int = 8989):
@@ -27,4 +26,4 @@ def create_default_client(host: str = "localhost", port: int = 8989):
     gcoder_methods.register_method_for_client(zmq_client.HWControlClient)
     drs_methods.register_method_for_client(zmq_client.HWControlClient)
 
-    client = zmq_client.HWControlClient(host, port)
+    return zmq_client.HWControlClient(host, port)

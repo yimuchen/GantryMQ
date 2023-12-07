@@ -587,11 +587,31 @@ PYBIND11_MODULE( gcoder, m )
 
   // Operation-like functions
   .def( "run_gcode",       &GCoder::RunGcode       )
-  .def( "set_speed_limit", &GCoder::SetSpeedLimit  )
-  .def( "move_to",         &GCoder::MoveTo         )
-  .def( "enable_stepper",  &GCoder::EnableStepper  )
-  .def( "disable_stepper", &GCoder::DisableStepper )
-  .def( "send_home",       &GCoder::SendHome       )
+  .def( "set_speed_limit",
+        &GCoder::SetSpeedLimit,
+        pybind11::arg( "x" ),
+        pybind11::arg( "y" ),
+        pybind11::arg( "z" ) )
+  .def( "move_to",
+        &GCoder::MoveTo,
+        pybind11::arg( "x" ),
+        pybind11::arg( "y" ),
+        pybind11::arg( "z" ) )
+  .def( "enable_stepper",
+        &GCoder::EnableStepper,
+        pybind11::arg( "x" ),
+        pybind11::arg( "y" ),
+        pybind11::arg( "z" ) )
+  .def( "disable_stepper",
+        &GCoder::DisableStepper,
+        pybind11::arg( "x" ),
+        pybind11::arg( "y" ),
+        pybind11::arg( "z" ) )
+  .def( "send_home",
+        &GCoder::SendHome,
+        pybind11::arg( "x" ),
+        pybind11::arg( "y" ),
+        pybind11::arg( "z" ) )
 
   // Read-like functions
   .def( "get_settings", &GCoder::GetSettings    )

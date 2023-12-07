@@ -3,9 +3,16 @@ requires = ["hatchling>=1.17.1", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "gqmclient"
+name = "gmqclient"
 authors = [{ name = "Yi-Mu Chen", email = "yimuchen@umd.edu" }]
-dependencies = ["opencv-python", "pyzmq", "scipy"]
+dependencies = [
+  "opencv-python",
+  "pyzmq",
+  "scipy",
+  "pyvisa-py",
+  "zeroconf",
+  "pyusb",
+]
 dynamic = ["version"]
 
 ### The following is for the construction of the package using hatchling

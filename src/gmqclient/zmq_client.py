@@ -31,8 +31,12 @@ class HWControlClient:
         # reason?)
         if self._run_function("is_operator"):
             self._run_function("release_operator")
+        self.socket.close()
 
-    def register_client_method(func_name: str, rename: Optional[str] = None) -> None:
+    @classmethod
+    def register_client_method(
+        cls, func_name: str, rename: Optional[str] = None
+    ) -> None:
         """
         Creating a dynamic method so that, instead of explicitly calling
         `client._run_function(<func_name>, **kwargs)`, the user can write
@@ -45,7 +49,7 @@ class HWControlClient:
         def __inner_call__(self, *args, **kwargs):
             return self._run_function(func_name, *args, **kwargs)
 
-        setattr(HWControlClient, rename, __inner_call__)
+        setattr(cls, rename, __inner_call__)
 
     def _run_function(self, func_name, *args, **kwargs):
         # Sending function inputs

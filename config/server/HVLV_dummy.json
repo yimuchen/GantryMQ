@@ -1,0 +1,6 @@
+{
+  "HV_ENABLE_GPIO": "DUMMY",
+  "HVLV_ADC_ADDR": "DUMMY",
+  "HV_DAC_ADDR": "DUMMY",
+  "LV_DAC_ADDR": "DUMMY"
+}
