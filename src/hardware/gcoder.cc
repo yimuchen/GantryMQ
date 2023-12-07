@@ -43,6 +43,13 @@
 class GCoder : private hw::fd_accessor
 {
 public:
+  // Constructor and destructor
+  GCoder( const std::string& dev_path );
+  GCoder()                 = delete;
+  GCoder( const GCoder& )  = delete;
+  GCoder( const GCoder&& ) = delete;
+  ~GCoder();
+
   static float _max_x;
   static float _max_y;
   static float _max_z;
@@ -82,16 +89,10 @@ public:
 
   static inline float round_val( float x ){ return std::round( x * 10 ) / 10;}
 
-  // Helper methods
+  // Operation variables
   float opx, opy, opz; /** target position of the printer */
   float cx, cy, cz;    /** current position of the printer */
   float vx, vy, vz;    /** Speed of the gantry head. */
-  // Constructor and destructor
-  GCoder( const std::string& dev_path );
-  GCoder()                 = delete;
-  GCoder( const GCoder& )  = delete;
-  GCoder( const GCoder&& ) = delete;
-  ~GCoder();
 };
 
 
@@ -212,12 +213,11 @@ GCoder::RunGcode( const std::string& gcode,
   static const unsigned maxtry = 10;
 
   if( attempt >= maxtry ){
-    raise_error(
-      fmt::format(
-        R"(ACK string for command [{0:s}] was not received after [{1:d}] attempts!
-        The message could be dropped or there is something wrong with the device!)",
-        gcode,
-        maxtry ) );
+    raise_error( fmt::format(
+                   R"(ACK string for command [{0:s}] was not received after [{1:d}] attempts!
+        The message could be dropped or there is something wrong with the device!)"                              ,
+                   gcode,
+                   maxtry ) );
   }
 
   // Sending output
@@ -466,16 +466,15 @@ GCoder::UpdateCoordinate()
   float a, b, c, temp; // feed position of extruder.
   float x, y, z;       // Temporary storage of the extract coordinates.
   try {
-    const int check = sscanf(
-      RunGcode( "M114" ).c_str(),
-      "X:%f Y:%f Z:%f E:%f Count X:%f Y:%f Z:%f",
-      &a,
-      &b,
-      &c,
-      &temp,
-      &x,
-      &y,
-      &z );
+    const int check = sscanf( RunGcode( "M114" ).c_str(),
+                              "X:%f Y:%f Z:%f E:%f Count X:%f Y:%f Z:%f",
+                              &a,
+                              &b,
+                              &c,
+                              &temp,
+                              &x,
+                              &y,
+                              &z );
     if( check != 7 ){ return false; } // Early exit for bad parse
     else {
       cx = x;
@@ -548,15 +547,13 @@ GCoder::ModifyTargetCoordinate( const float original, const float max_value )
     printwarn( fmt::format(
                  R"(Target coordinate values [{0:.1f}] is below the lower limit 0.1.
                  Modifying the target motion coordinate to 0.1 to avoid damaging
-                 the system)",
-                 ans ) );
+                 the system)"                            , ans ) );
     return 0.1;
   } else if( ans > max_value ){
     printwarn( fmt::format(
                  R"(Target coordinate values [{0:.1f}] is above upper limit
                  [{1:.1f}]. Modifying the target motion coordinate to [{1:.1f}] to
-                 avoid damaging the system)",
-                 ans,
+                 avoid damaging the system)"                            , ans,
                  max_value ));
 
     return GCoder::round_val( max_value );
@@ -590,11 +587,31 @@ PYBIND11_MODULE( gcoder, m )
 
   // Operation-like functions
   .def( "run_gcode",       &GCoder::RunGcode       )
-  .def( "set_speed_limit", &GCoder::SetSpeedLimit  )
-  .def( "move_to",         &GCoder::MoveTo         )
-  .def( "enable_stepper",  &GCoder::EnableStepper  )
-  .def( "disable_stepper", &GCoder::DisableStepper )
-  .def( "send_home",       &GCoder::SendHome       )
+  .def( "set_speed_limit",
+        &GCoder::SetSpeedLimit,
+        pybind11::arg( "x" ),
+        pybind11::arg( "y" ),
+        pybind11::arg( "z" ) )
+  .def( "move_to",
+        &GCoder::MoveTo,
+        pybind11::arg( "x" ),
+        pybind11::arg( "y" ),
+        pybind11::arg( "z" ) )
+  .def( "enable_stepper",
+        &GCoder::EnableStepper,
+        pybind11::arg( "x" ),
+        pybind11::arg( "y" ),
+        pybind11::arg( "z" ) )
+  .def( "disable_stepper",
+        &GCoder::DisableStepper,
+        pybind11::arg( "x" ),
+        pybind11::arg( "y" ),
+        pybind11::arg( "z" ) )
+  .def( "send_home",
+        &GCoder::SendHome,
+        pybind11::arg( "x" ),
+        pybind11::arg( "y" ),
+        pybind11::arg( "z" ) )
 
   // Read-like functions
   .def( "get_settings", &GCoder::GetSettings    )

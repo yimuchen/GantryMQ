@@ -31,8 +31,9 @@ public:
   void pulse( const unsigned n, const unsigned wait ) const;
 
   // Static flags for helping with settings
-  static constexpr int READ  = O_RDONLY;
-  static constexpr int WRITE = O_WRONLY;
+  static constexpr int READ       = O_RDONLY;
+  static constexpr int WRITE      = O_WRONLY;
+  static constexpr int READ_WRITE = O_RDWR;
 
   static std::string make_device_name( const uint8_t pin_idx,
                                        const int     direction );
@@ -70,8 +71,7 @@ gpio::make_device_name( const uint8_t pin_idx, const int direction )
 
   // Getting the direction path
   const std::string dir_path = fmt::format(
-    "/sys/class/gpio/gpio{0:d}/direction",
-    pin_idx );
+    "/sys/class/gpio/gpio{0:d}/direction", pin_idx );
 
   hw::fd_accessor::wait_fd_access( dir_path );
   hw::sleep_milliseconds( 100 );
@@ -151,5 +151,6 @@ PYBIND11_MODULE( gpio, m )
 
   .def_readonly_static( "READ",  &gpio::READ )
   .def_readonly_static( "WRITE", &gpio::WRITE )
+  .def_readonly_static( "READ_WRITE", &gpio::READ_WRITE )
   ;
 }

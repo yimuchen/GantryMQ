@@ -1,108 +1,115 @@
 # Gantry MQ
 
 Controlling the gantry and accompanying hardware attached to a Raspberry Pi
-through a message queue system. This allows gantry related hardware to be
+through a message queue system. This allows gantry-related hardware to be
 elegantly detached and reattached while the hardware is physically moved to
 different quality assurance test stations.
 
 The server and client side will be kept in the same library to ensure feature
 parity between functionalities available at the server and what is exposed for
 the client can be maintained within the same code base. The installation
-instructions for the server and the client, however is fundamentally different.
+instructions for the server and the client, however, are fundamentally different.
 
 ## Setting up the server
 
-### Prerequisites
+The details for setting up the server software for running on the Raspberry Pi
+will be detailed in the `INSTALL_SERVER.md` file, as it requires additional
+hardware permission setup. Look to that file if you are attempting to set up a
+new system from scratch.
 
-Here we are assuming that the server will be ran on a Raspberry Pi. Modify the
-`/boot/config.txt` file so that PWM and I2C interfaces are available: add the
-following lines to the _after_ the kernel loading line:
-
-```bash
-dtoverlay=pwm-2chan
-dtparam=i2c_arm=on
-```
-
-Next, we create new permission groups to avoid running the master program as
-root. If you are testing this program on your personal machine, do **not** add
-yourself to the `gpio` and `i2c` groups, as these devices are typically reserved
-for temperature monitor and control system on typical computer laptop. Randomly
-changing `i2c` and `gpio` value **will** damage your device.
+For software testing, we have provided a docker file in this repository such
+that users can test the software capabilities of the server before fully
+deploying, to build the image file, run the following command on your machine:
 
 ```bash
-groupadd -f -r pico
-usermod -a -G pico ${USER}
-groupadd -f -r drs
-usermod -a -G drs ${USER}
-## DO NOT ADD!! unless you are sure of what you are doing!
-# groupadd -f -r gpio
-# usermod -a -G gpio ${USER}
-# groupadd -f -r i2c
-# usermod -a -G i2c ${USER}
+docker buildx build --file tests/docker/Dockerfile --tag gantrymq   \
+       --network="host"  --platform ${PLATFORM}  --rm --load ./
 ```
 
-Then, copy the custom `udev` rules to expose device IDs to the various groups.
+The `${PLATFORM}` variable should match what machine you are running the test
+on (tested using `linux/amd64`).
+
+To start up the docker session run the command:
 
 ```bash
-cp external/rules/pico.rules  /etc/udev/rules/
-cp external/rules/drs.rules   /etc/udev/rules/
-## DO NOT ADD unless you are sure of what you are doing!!
-# cp external/rules/digi.rules  /etc/udev/rules/
+docker run -it                                              \
+       --network="host"                                     \
+       --platform ${PLATFORM}                               \
+       --mount type=bind,source="${PWD}",target=/srv        \
+       --privileged -v /dev/video1:/dev/video1              \
+       gantrymq:latest                                      \
+       /bin/bash --init-file "/srv/tests/docker/bashrc.sh"
 ```
 
-Reboot the Raspberry Pi board to have everything take effect. If you are running
-servers for testing, the software can still be installed and run without the
-permission setup above, but hardware control will not function properly
-(hardware initialization would likely throw an error). You will, however, still
-need to install the following software requirements:
+Notice that if you are running in docker, it is likely that most of the hardware
+will not function, and is not strictly a bug in the system. If you want to test
+the camera device, modify the exposed device.
 
-- `git`, `wget` for getting the code base
-- `g++` and `cmake3`: for compiling the code. The compiler should support C++17
-- `pybind11` and python headers: for exposing C++ code to python
-- `fmt`: a standardized C++ formatting library
-- `wxWidget`, `libusb`: for interfacing with the DRS4 headless oscilloscope.
-- `python-pika`: for the rabbit-MQ system used for client-server communication.
+## Setting up the client-side software
 
-### Installing the Server software
-
-This can be done with direct command copy and paste:
+As the client-side software does not require additional permissions or hardware,
+the safest way would be to download the repository and install the package as a
+pip package:
 
 ```bash
 git clone https://github.com/UMDCMS/GantryMQ.git
-cd GantryMQ
-./external/fetch_external.sh # Getting external libraries
-cmake ./
-cmake --build ./
+python -m venv gantryenv
+source gantryenv/bin/activate
+python -m pip install ./GantryMQ
 ```
 
-This would set up all the environment for running the server.
+Notice that you will need to reload the Python virtual environment every time.
 
-### Testing hardware interactions locally on the server machine
+## Testing hardware interactions
+
+### Locally on the server machine
 
 Once the server-side software is installed, we can test the hardware interaction
 on the server machine to make sure everything is working nominally on the server
-side.
+side. The following commands will likely not work in the docker session. The
+commands here also assume that you have access to the various hardware
+interfaces. You may also need to modify the access addresses and pins to match
+whatever hardware is attached to your system.
 
 ```python
 cd GantryMQ # Tests are not intended to be ran anywhere else other than the project directory
-export PYTHONPATH=$PYTHONPATH:$PWD
-python tests/local/gcoder.py # Testing gcoder
-python tests/local/gpio.py   # Testing GPIO interactions
-python tests/local/i2c_ads1115.py # Testing the I2C ADC interaction
+PYTHONPATH=$PYTHONPATH:$PWD python tests/hardware/gcoder.py # Testing gcoder
+PYTHONPATH=$PYTHONPATH:$PWD python tests/hardware/gpio.py   # Testing GPIO interactions
+PYTHONPATH=$PYTHONPATH:$PWD python tests/hardware/i2c_ads1115.py # Testing the I2C ADC interaction
+PYTHONPATH=$PYTHONPATH:$PWD python tests/hardware/i2c_mcp4725.py # Testing the I2C DAC interaction
 ```
 
-### Starting the server software
+### Testing with server-client interactions
 
-TBD
+The various modules defined in the `src/gmqserver` and `src/gmqclient`
+directories provide example scripts for testing single hardware interactions.
+The following instruction assumes that you are in the `GantryMQ` for both the
+server and the client-side machine. Notice additional methods command line
+arguments can be passed to the client-side script to modify the behavior, as by
+default, the client will attempt to connect to the server running on the local
+machine. Once the server is spawned, hit Ctrl+C to exit the server.
 
-## Setting up client software
-
-The client software is written in pure python, and can be installed using pip to
-the python virtual environment:
+#### Testing the ZMQ server functionality
 
 ```bash
-python -m pip install https://github.com/UMDCMS/GantryMQ.git
+# Server-side
+python src/gmqserver/zmq_server.py
+# Client-side
+python src/gmqclient/zmq_client.py
 ```
 
-This will give you the `gmqclient` module in your python environment with the
-various control clients to be used.
+#### Testing the various control systems
+
+Currently implemented systems include `gcoder`, `camera`, and `drs`. If you are
+testing on your machine, various hardware interfaces may not be available.
+
+```bash
+# Server-side
+python src/gmqserver/${system}_methods.py
+# Client-side
+python src/gmqclient/${system}_methods.py --help
+```
+
+For other interactions, because interactions with the ICs on the auxiliary
+helper boards need to be set up according to the required specs, consult the
+documentation found in the [`\_doc`](_doc) folder for detailed instructions.

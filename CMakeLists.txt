@@ -47,6 +47,7 @@ endfunction()
 make_hardware_library(gcoder      src/hardware/gcoder.cc)
 make_hardware_library(gpio        src/hardware/gpio.cc)
 make_hardware_library(i2c_ads1115 src/hardware/i2c_ads1115.cc)
+make_hardware_library(i2c_mcp4725 src/hardware/i2c_mcp4725.cc)
 
 # The DRS4 library, this assumes that the stuff have been added to the
 if( EXISTS "external/drs" )

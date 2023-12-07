@@ -47,8 +47,8 @@ fd_accessor::fd_accessor( const std::string& dev_name,
   // The _lock will be non-zero if the processes cannot create the lock instance
   if( lock ){
     if( flock( this->_fd, LOCK_EX | LOCK_NB ) ){
-      this->close_with_error(
-        fmt::format( "Failed to lock path [{0:s}]", dev_path ));
+      this->close_with_error( fmt::format( "Failed to lock path [{0:s}]",
+                                           dev_path ));
     }
   }
 }
@@ -137,7 +137,7 @@ fd_accessor::write( const std::vector<uint8_t>& message ) const
 int
 fd_accessor::write( const std::string& message ) const
 {
-  return this->write( std::vector<uint8_t>( message.begin(), message.end()));
+  return this->write( std::vector<uint8_t>( message.begin(), message.end() ) );
 }
 
 
@@ -176,8 +176,7 @@ fd_accessor::read_str( const unsigned n ) const
 
   if( ( n > 0 )  && ( readlen != (int)n ) ){
     raise_error( fmt::format(
-                   "mismatch message length. Expected [{0:d}], got [{1:d}]",
-                   n,
+                   "mismatch message length. Expected [{0:d}], got [{1:d}]", n,
                    readlen ));
   }
   return std::string( buffer, buffer+readlen );

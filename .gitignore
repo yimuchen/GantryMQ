@@ -9,4 +9,6 @@ CMake*
 Makefile
 *.cmake
 src/gmqclient/version.py
+src/gmqserver/__pycache__/
+src/gmqclient/__pycache__/
 !CMakeLists.txt
