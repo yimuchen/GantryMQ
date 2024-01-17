@@ -25,7 +25,7 @@ class HWControlClient:
         HWControlClient.register_client_method("claim_operator")
         HWControlClient.register_client_method("is_operator")
 
-    def __del__(self):
+    def close(self):
         # Always attempt to release the operator on exit. For methods in the
         # destructor, we cannot use the dynamically declared methods (for some
         # reason?)
@@ -101,3 +101,5 @@ if __name__ == "__main__":
         print(client._run_function("mytest"))
     except Exception as err:
         print(err)
+
+    client.close()

@@ -72,3 +72,5 @@ if __name__ == "__main__":
     print("C1 voltage [mV]", client.senaux_adc_readmv(1))
     print("C1 bias resistors [Ohm]", client.senaux_adc_biasresistor(1))
     print("C1 resistance [Ohm]", client.senaux_adc_readresistor(1))
+
+    client.close()

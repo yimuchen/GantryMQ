@@ -52,3 +52,4 @@ if __name__ == "__main__":
     client.set_lv_bias(0.554)
     client.get_lv_mv()
     time.sleep(1)
+    client.close()

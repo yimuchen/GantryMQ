@@ -65,7 +65,9 @@ if __name__ == "__main__":
     client.claim_operator()
     # client.reset_gcoder_device(args.devpath)
     print(client.get_coord())
-    #client.send_home(x=True, y=True, z=True)
+    # client.send_home(x=True, y=True, z=True)
     print(client.get_coord())
     client.move_to(x=11, y=12, z=13)
     print(client.get_coord())
+
+    client.close()

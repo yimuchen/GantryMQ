@@ -10,40 +10,26 @@ parity between functionalities available at the server and what is exposed for
 the client can be maintained within the same code base. The installation
 instructions for the server and the client, however, are fundamentally different.
 
+The instruction here will be concerned with software deployment. To see the
+instructions for local testing, see [`doc/local.md`](doc/local.md). As the
+software prerequisite on the server side is also rather long, see the
+[`doc/install_server.md`](doc/install_server.md) for detailed instructions
+there.
+
 ## Setting up the server
 
-The details for setting up the server software for running on the Raspberry Pi
-will be detailed in the `INSTALL_SERVER.md` file, as it requires additional
-hardware permission setup. Look to that file if you are attempting to set up a
-new system from scratch.
+For the full instructions, see the instructions [here](doc/install_server.md),
+but the bulk of the requirements should have been repaired by the system
+administrators already.
 
-For software testing, we have provided a docker file in this repository such
-that users can test the software capabilities of the server before fully
-deploying, to build the image file, run the following command on your machine:
-
-```bash
-docker buildx build --file tests/docker/Dockerfile --tag gantrymq   \
-       --network="host"  --platform ${PLATFORM}  --rm --load ./
-```
-
-The `${PLATFORM}` variable should match what machine you are running the test
-on (tested using `linux/amd64`).
-
-To start up the docker session run the command:
+Here we just remind you that the Python environment needs to be set up
+appropriately for a newly logged-in session, if the required environment has not
+been set up globally:
 
 ```bash
-docker run -it                                              \
-       --network="host"                                     \
-       --platform ${PLATFORM}                               \
-       --mount type=bind,source="${PWD}",target=/srv        \
-       --privileged -v /dev/video1:/dev/video1              \
-       gantrymq:latest                                      \
-       /bin/bash --init-file "/srv/tests/docker/bashrc.sh"
+cd GantryMQ
+export PYTHONPATH=$PYTHONPATH:$PATH
 ```
-
-Notice that if you are running in docker, it is likely that most of the hardware
-will not function, and is not strictly a bug in the system. If you want to test
-the camera device, modify the exposed device.
 
 ## Setting up the client-side software
 
@@ -100,16 +86,31 @@ python src/gmqclient/zmq_client.py
 
 #### Testing the various control systems
 
-Currently implemented systems include `gcoder`, `camera`, and `drs`. If you are
-testing on your machine, various hardware interfaces may not be available.
+Currently implemented systems include `gcoder`, `camera`, `drs`, `rigol`, `HVLV`
+and `SenAUX`. Make sure that the connected hardware is visible to the server
+before attempting to run the following instructions.
 
 ```bash
 # Server-side
-python src/gmqserver/${system}_methods.py
+python src/gmqserver/${system}_methods.py --help
 # Client-side
 python src/gmqclient/${system}_methods.py --help
 ```
 
 For other interactions, because interactions with the ICs on the auxiliary
 helper boards need to be set up according to the required specs, consult the
-documentation found in the [`\_doc`](_doc) folder for detailed instructions.
+documentation found in the [`doc/aux_board.md`](doc/aux_board.md) or similar for
+detailed instructions.
+
+## Preparing the deployment server
+
+To deploy a server, you can run the following command on the server machine:
+
+```bash
+cd GantryMQ/src/gmqserver
+python3 deploy.py --hw1 --hw2
+```
+
+The various deployment flags will be used to indicate how the various hardware
+interfaces is set up. Run `python3 deploy.py --help` if you are unsure about
+some requirements of the hardware interface.

@@ -178,17 +178,15 @@ perform adjustments on the fly:
 python # Start the python shell in the client side software
 ### The following section is required
 >>> import gmqclient
->>> gmqclient.HVLV_methods.register_method_for_client(gmqclient.HWControlClient)
+>>> gmqclient.SenAUX_methods.register_method_for_client(gmqclient.HWControlClient)
 >>> client = gmqclient.HWControlClient(_IP_, _PORT_) # You will need to obtain server configuration
 >>> client.claim_operator()
 
 ### The following can them be whatever instruction you are interested in.
 >>> client.hv_enable() #
->>> client.set_lv_bias(0.554) # Units in MV.
+>>> client.set_lv_bias(554) # Units in MV.
 >>> client.get_lv_mv() #
-0.5534 ## Printing units in MV
+553.4 ## Printing units in MV
 ```
-
-TBD
 
 [SensAUXBoard]: https://github.com/UMDCMS/SiPMCalibHW/tree/main/_manual#auxillary-monitor-and-power-driving-hat-board
