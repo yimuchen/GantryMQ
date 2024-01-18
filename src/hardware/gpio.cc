@@ -35,8 +35,7 @@ public:
   static constexpr int WRITE      = O_WRONLY;
   static constexpr int READ_WRITE = O_RDWR;
 
-  static std::string make_device_name( const uint8_t pin_idx,
-                                       const int     direction );
+  static std::string make_device_name( const uint8_t pin_idx, const int direction );
 };
 
 /**
@@ -49,12 +48,14 @@ public:
  * make_device_name method. If this pre-routine fails, a exception will be
  * raised, and the primary file descriptor will never be initialized.
  */
-gpio::gpio( const uint8_t pin_idx, const int direction ) :      //
+gpio::gpio( const uint8_t pin_idx, const int direction )
+  : //
   hw::fd_accessor( gpio::make_device_name( pin_idx, direction ),
-                   fmt::format( "/sys/class/gpio/gpio{0:d}/value", pin_idx ),  //
-                   direction ),
-  _pin_idx       ( pin_idx )
-{}
+                   fmt::format( "/sys/class/gpio/gpio{0:d}/value", pin_idx ), //
+                   direction )
+  , _pin_idx( pin_idx )
+{
+}
 
 /**
  * @brief Static method of enabling a pin to be used.
@@ -63,24 +64,20 @@ std::string
 gpio::make_device_name( const uint8_t pin_idx, const int direction )
 {
   // Enabling pin
-  hw::fd_accessor( "GPIO_export",
-                   "/sys/class/gpio/export",
-                   hw::fd_accessor::MODE::WRITE_ONLY )
-  .write( fmt::format( "{0:d}", pin_idx ) );
+  hw::fd_accessor( "GPIO_export", "/sys/class/gpio/export", hw::fd_accessor::MODE::WRITE_ONLY )
+    .write( fmt::format( "{0:d}", pin_idx ) );
   hw::sleep_milliseconds( 100 );
 
   // Getting the direction path
-  const std::string dir_path = fmt::format(
-    "/sys/class/gpio/gpio{0:d}/direction", pin_idx );
+  const std::string dir_path = fmt::format( "/sys/class/gpio/gpio{0:d}/direction", pin_idx );
 
   hw::fd_accessor::wait_fd_access( dir_path );
   hw::sleep_milliseconds( 100 );
   hw::fd_accessor( "GPIO_dir", dir_path, hw::fd_accessor::MODE::READ_WRITE )
-  .write( ( direction == gpio::READ ) ? "in" : "out" );
+    .write( ( direction == gpio::READ ) ? "in" : "out" );
 
   return fmt::format( "GPIO_{0:d}", pin_idx );
 }
-
 
 /**
  * @brief Additional routine needs to deallocate the the system resources of the
@@ -88,12 +85,9 @@ gpio::make_device_name( const uint8_t pin_idx, const int direction )
  */
 gpio::~gpio()
 {
-  hw::fd_accessor( "GPIO_unexport",
-                   "/sys/class/gpio/unexport",
-                   hw::fd_accessor::MODE::WRITE_ONLY )
-  .write( fmt::format( "{0:d}", this->_pin_idx ));
+  hw::fd_accessor( "GPIO_unexport", "/sys/class/gpio/unexport", hw::fd_accessor::MODE::WRITE_ONLY )
+    .write( fmt::format( "{0:d}", this->_pin_idx ) );
 }
-
 
 /**
  * @brief Slow write operation to toggle the pin value. Run all typically write
@@ -105,7 +99,6 @@ gpio::slow_write( const bool x ) const
   this->write( x ? "1" : "0" );
 }
 
-
 /**
  * @brief Slow read operation to check for current voltage value. Run all
  * typical read checks and raises exception if checks fail.
@@ -115,7 +108,6 @@ gpio::slow_read() const
 {
   return this->read_str() == "1";
 }
-
 
 /**
  * @brief Generating N pulses with some time in between pulses. Only 1 validity
@@ -128,7 +120,7 @@ void
 gpio::pulse( const unsigned n, const unsigned wait ) const
 {
   check_valid();
-  for( unsigned i = 0; i < n; ++i ){
+  for( unsigned i = 0; i < n; ++i ) {
     this->write_raw( "1", 1 );
     hw::sleep_nanoseconds( 500 );
     this->write_raw( "0", 1 );
@@ -136,21 +128,19 @@ gpio::pulse( const unsigned n, const unsigned wait ) const
   }
 }
 
-
 PYBIND11_MODULE( gpio, m )
 {
   pybind11::class_<gpio>( m, "gpio" )
-  .def( pybind11::init<const uint8_t, const int>() )
+    .def( pybind11::init<const uint8_t, const int>() )
 
-  // Command-like function calls
-  .def( "slow_write", &gpio::slow_write )
-  .def( "pulse", &gpio::pulse, pybind11::arg( "n" ), pybind11::arg( "wait" ) )
+    // Command-like function calls
+    .def( "slow_write", &gpio::slow_write )
+    .def( "pulse", &gpio::pulse, pybind11::arg( "n" ), pybind11::arg( "wait" ) )
 
-  // Read-only function calls.
-  .def( "slow_read", &gpio::slow_read )
+    // Read-only function calls.
+    .def( "slow_read", &gpio::slow_read )
 
-  .def_readonly_static( "READ",  &gpio::READ )
-  .def_readonly_static( "WRITE", &gpio::WRITE )
-  .def_readonly_static( "READ_WRITE", &gpio::READ_WRITE )
-  ;
+    .def_readonly_static( "READ", &gpio::READ )
+    .def_readonly_static( "WRITE", &gpio::WRITE )
+    .def_readonly_static( "READ_WRITE", &gpio::READ_WRITE );
 }

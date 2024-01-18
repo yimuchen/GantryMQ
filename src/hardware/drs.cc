@@ -57,10 +57,7 @@ public:
   void ForceStop();
 
   // Setting commands
-  void SetTrigger( const unsigned channel,
-                   const double   level,
-                   const unsigned direction,
-                   const double   delay );
+  void SetTrigger( const unsigned channel, const double level, const unsigned direction, const double delay );
   void SetRate( const double frequency );
   void SetSamples( const unsigned );
 
@@ -69,11 +66,11 @@ public:
   pybind11::array_t<float> GetTimeArray( const unsigned channel );
 
   // High level interfaces
-  double WaveformSum( const unsigned channel,
-                      const unsigned intstart = -1,
-                      const unsigned intstop  = -1,
-                      const unsigned pedstart = -1,
-                      const unsigned pedstop  = -1 );
+  double   WaveformSum( const unsigned channel,
+                        const unsigned intstart = -1,
+                        const unsigned intstop  = -1,
+                        const unsigned pedstart = -1,
+                        const unsigned pedstop  = -1 );
   void     RunCalib();
   int      TriggerChannel();
   int      TriggerDirection();
@@ -109,7 +106,6 @@ private:
   static std::string make_lockfile();
 };
 
-
 /**
  * @brief Initializing the DRS4 container in single shot mode, and external
  * triggers.
@@ -119,19 +115,20 @@ private:
  * commented out to make sure future development doesn't open certain settings
  * that is already known to cause issues by accident.
  */
-DRSContainer::DRSContainer() ://
-  hw::fd_accessor( "DRS", make_lockfile(), hw::fd_accessor::MODE::READ_WRITE ),
-  drs            ( nullptr ),
-  board          ( nullptr )
+DRSContainer::DRSContainer()
+  : //
+  hw::fd_accessor( "DRS", make_lockfile(), hw::fd_accessor::MODE::READ_WRITE )
+  , drs( nullptr )
+  , board( nullptr )
 {
   printdebug( "Setting up DRS devices..." );
   char str[256];
   drs = std::make_unique<DRS>();
-  if( drs->GetError( str, sizeof( str ) ) ){
+  if( drs->GetError( str, sizeof( str ) ) ) {
     drs = nullptr;
     raise_error( fmt::format( "Error created DRS instance: [{0:s}]", str ) );
   }
-  if( !drs->GetNumberOfBoards() ){
+  if( !drs->GetNumberOfBoards() ) {
     drs = nullptr;
     raise_error( "No DRS boards found" );
   }
@@ -139,18 +136,17 @@ DRSContainer::DRSContainer() ://
   // Only getting the first board for now.
   board = drs->GetBoard( 0 );
   board->Init();
-  printdebug( fmt::format(
-                "Found DRS[{0:d}] board on USB, serial [{1:04d}], firmware [{2:5d}]\n",
-                board->GetDRSType(),
-                board->GetBoardSerialNumber(),
-                board->GetFirmwareVersion() ));
+  printdebug( fmt::format( "Found DRS[{0:d}] board on USB, serial [{1:04d}], firmware [{2:5d}]\n",
+                           board->GetDRSType(),
+                           board->GetBoardSerialNumber(),
+                           board->GetFirmwareVersion() ) );
 
   // Thread sleep to allow for settings to settle down
   hw::sleep_microseconds( 5 );
 
   // Running the various common settings required for the SiPM calibration
   // board->SetChannelConfig( 0, 8, 8 );// 1024 binning
-  board->SetFrequency( 2.0, true );// Running at target 2GHz sample rate.
+  board->SetFrequency( 2.0, true ); // Running at target 2GHz sample rate.
   // DO NOT ENABLE TRANSPARENT MODE!!!
   // board->SetTranspMode( 1 );
   // board->SetDominoMode( 0 );// Singe shot mode
@@ -162,16 +158,15 @@ DRSContainer::DRSContainer() ://
   // DO NOT ENABLE INTERNAL CLOCK CALIBRATION!!
   // board->EnableTcal( 1 );
   // By default setting to use the external trigger
-  SetTrigger( 4,// Channel external trigger
-              0.05,// Trigger on 0.05 voltage
-              1,// Rising edge
-              0 );// 0 nanosecond delay by default.
+  SetTrigger( 4,    // Channel external trigger
+              0.05, // Trigger on 0.05 voltage
+              1,    // Rising edge
+              0 );  // 0 nanosecond delay by default.
   // Additional sleep for configuration to get through.
   hw::sleep_microseconds( 5 );
 
   printdebug( "Completed setting DRS Container" );
 }
-
 
 /**
  * @brief Waiting for the DRS4 to be ready for data transfer.
@@ -185,11 +180,11 @@ void
 DRSContainer::WaitReady()
 {
   CheckAvailable();
-  while( board->IsBusy() ){
+  while( board->IsBusy() ) {
     hw::sleep_microseconds( 5 );
-  } board->TransferWaves( 0, 8 );// Flush all waveforms into buffer.
+  }
+  board->TransferWaves( 0, 8 ); // Flush all waveforms into buffer.
 }
-
 
 /**
  * @brief Getting the time slice array for precision timing of a specific
@@ -208,9 +203,8 @@ DRSContainer::GetTimeArrayRaw( const unsigned channel )
   float                 time_array[len];
   WaitReady();
   board->GetTime( 0, 2 * channel, board->GetTriggerCell( 0 ), time_array );
-  return std::vector<float>( time_array, time_array+len );
+  return std::vector<float>( time_array, time_array + len );
 }
-
 
 /**
  * @brief Getting the time slice array for precision timing of a specific
@@ -226,7 +220,6 @@ DRSContainer::GetTimeArray( const unsigned channel )
     GetSamples(),
     GetTimeArrayRaw( channel ).data() );
 }
-
 
 /**
  * @brief Returning the last collected waveform as an array of floats
@@ -249,12 +242,11 @@ DRSContainer::GetWaveFormRaw( const unsigned channel )
   // Notice that channel index 0-1 both correspond to the the physical
   // channel 1 input, and so on.
   int status = board->GetWave( 0, channel * 2, waveform );
-  if( status ){
+  if( status ) {
     raise_error( "Error running DRSBoard::GetWave" );
   }
-  return std::vector<float>( waveform, waveform+len );
+  return std::vector<float>( waveform, waveform + len );
 }
-
 
 /**
  * @brief Returning the last collected waveform as an array of floats, casting
@@ -269,7 +261,6 @@ DRSContainer::GetWaveform( const unsigned channel )
     GetSamples(),
     GetWaveFormRaw( channel ).data() );
 }
-
 
 /**
  * @brief Returning the waveform of a given channel summed over the integration
@@ -296,28 +287,27 @@ DRSContainer::WaveformSum( const unsigned channel,
   double         pedvalue = 0;
 
   // Getting the pedestal value if required
-  if( _pedstart != _pedstop ){
-    const unsigned pedstart = std::max( unsigned(0), _pedstart );
+  if( _pedstart != _pedstop ) {
+    const unsigned pedstart = std::max( unsigned( 0 ), _pedstart );
     const unsigned pedstop  = std::min( maxlen, _pedstop );
-    for( unsigned i = pedstart; i < pedstop; ++i ){
+    for( unsigned i = pedstart; i < pedstop; ++i ) {
       pedvalue += waveform[i];
     }
-    pedvalue /= (double)( pedstop-pedstart );
+    pedvalue /= (double)( pedstop - pedstart );
   }
 
   // Running the additional parsing.
-  const unsigned intstart  = std::max( unsigned(0), _intstart );
+  const unsigned intstart  = std::max( unsigned( 0 ), _intstart );
   const unsigned intstop   = std::min( maxlen, _intstop );
   double         ans       = 0;
   const double   timeslice = 1.0 / GetRate();
-  for( unsigned i = intstart; i < intstop; ++i ){
+  for( unsigned i = intstart; i < intstop; ++i ) {
     ans += waveform[i];
   }
-  ans -= pedvalue * ( intstop-intstart );
-  ans *= -timeslice;// Negative to correct pulse direction
+  ans -= pedvalue * ( intstop - intstart );
+  ans *= -timeslice; // Negative to correct pulse direction
   return ans;
 }
-
 
 /**
  * @brief Setting the trigger
@@ -327,18 +317,15 @@ DRSContainer::WaveformSum( const unsigned channel,
  * channels. Delay will always be in units of nanoseconds.
  */
 void
-DRSContainer::SetTrigger( const unsigned channel,
-                          const double   level,
-                          const unsigned direction,
-                          const double   delay )
+DRSContainer::SetTrigger( const unsigned channel, const double level, const unsigned direction, const double delay )
 {
   CheckAvailable();
-  board->EnableTrigger( 1, 0 );// Using hardware trigger
+  board->EnableTrigger( 1, 0 ); // Using hardware trigger
   board->SetTriggerSource( 1 << channel );
   triggerchannel = channel;
 
   // Certain trigger settings are only used for internal triggers.
-  if( channel < 4 ){
+  if( channel < 4 ) {
     board->SetTriggerLevel( level );
     triggerlevel = level;
     board->SetTriggerPolarity( direction );
@@ -351,7 +338,6 @@ DRSContainer::SetTrigger( const unsigned channel,
   hw::sleep_microseconds( 500 );
 }
 
-
 /**
  * @brief Getting the trigger channel stored in object.
  */
@@ -360,7 +346,6 @@ DRSContainer::TriggerChannel()
 {
   return triggerchannel;
 }
-
 
 /**
  * @brief Getting the trigger direction stored in object.
@@ -371,7 +356,6 @@ DRSContainer::TriggerDirection()
   return triggerdirection;
 }
 
-
 /**
  * @brief Getting the trigger delay in the DRS instance.
  */
@@ -381,7 +365,6 @@ DRSContainer::TriggerDelay()
   return triggerdelay;
 }
 
-
 /**
  * @brief Getting the trigger level stored in object
  */
@@ -390,7 +373,6 @@ DRSContainer::TriggerLevel()
 {
   return triggerlevel;
 }
-
 
 /**
  * @brief Setting the data sampling rate.
@@ -405,7 +387,6 @@ DRSContainer::SetRate( const double x )
   board->SetFrequency( x, true );
 }
 
-
 /**
  * @brief Getting the true sampling rate
  */
@@ -418,7 +399,6 @@ DRSContainer::GetRate()
   return ans;
 }
 
-
 /**
  * @brief Getting the number of sample to store.
  */
@@ -428,7 +408,6 @@ DRSContainer::GetSamples()
   return std::min( (unsigned)board->GetChannelDepth(), samples );
 }
 
-
 /**
  * @brief Setting the number of values to store by default
  */
@@ -437,7 +416,6 @@ DRSContainer::SetSamples( const unsigned x )
 {
   samples = x;
 }
-
 
 /**
  * @brief Starting a single-shot collection request.
@@ -449,7 +427,6 @@ DRSContainer::StartCollect()
   board->StartDomino();
 }
 
-
 /**
  * @brief Forcing the collection to stop.
  */
@@ -460,7 +437,6 @@ DRSContainer::ForceStop()
   board->SoftTrigger();
 }
 
-
 /**
  * @brief Checking that a DRS4 is available for operation. Throw exception if
  * not.
@@ -468,11 +444,10 @@ DRSContainer::ForceStop()
 void
 DRSContainer::CheckAvailable() const
 {
-  if( !IsAvailable() ){
+  if( !IsAvailable() ) {
     raise_error( "DRS4 board is not available" );
   }
 }
-
 
 /**
  * @brief True/False flag for whether the DRS4 is available for operation.
@@ -483,7 +458,6 @@ DRSContainer::IsAvailable() const
   return drs != nullptr && board != nullptr;
 }
 
-
 /**
  * @brief Simple check for whether data collection has finished.
  */
@@ -492,7 +466,6 @@ DRSContainer::IsReady()
 {
   return !board->IsBusy();
 }
-
 
 /**
  * @brief Running the timing calibration.
@@ -506,8 +479,8 @@ DRSContainer::RunCalib()
   // Dummy class for overloading the callback function
   class DummyCallback : public DRSCallback
   {
-public:
-    virtual void Progress( int ){} // Do nothing
+  public:
+    virtual void Progress( int ) {} // Do nothing
   };
   CheckAvailable();
 
@@ -521,12 +494,11 @@ public:
 
   // After running, we will need to reset the board trigger configurations
   // By default setting to use the external trigger
-  SetTrigger( TriggerChannel(),// Channel external trigger
-              TriggerLevel(),// Trigger on 0.05 voltage
-              TriggerDirection(),// Rising edge
-              TriggerDelay() );// 0 nanosecond delay by default.
+  SetTrigger( TriggerChannel(),   // Channel external trigger
+              TriggerLevel(),     // Trigger on 0.05 voltage
+              TriggerDirection(), // Rising edge
+              TriggerDelay() );   // 0 nanosecond delay by default.
 }
-
 
 /**
  * @brief Simple method for creating the lock file in the /tmp directory.
@@ -538,51 +510,46 @@ DRSContainer::make_lockfile()
 
   // Checking if the lock file actually exists. Creating if not.
   std::fstream lock_fs;
-  lock_fs.open( filename,
-                std::fstream::in | std::fstream::out | std::fstream::app );
+  lock_fs.open( filename, std::fstream::in | std::fstream::out | std::fstream::app );
 
-  if( !lock_fs ){
-    lock_fs.open( filename,
-                  std::fstream::in | std::fstream::out | std::fstream::trunc );
+  if( !lock_fs ) {
+    lock_fs.open( filename, std::fstream::in | std::fstream::out | std::fstream::trunc );
   }
   lock_fs.close();
 
   return filename;
 }
 
-
 DRSContainer::~DRSContainer()
 {
   printdebug( "Deallocating the DRS controller" );
 }
 
-
 PYBIND11_MODULE( drs, m )
 {
   pybind11::class_<DRSContainer>( m, "drs" )
-  .def( pybind11::init<>() )
+    .def( pybind11::init<>() )
 
-  // Operation functions
-  .def( "force_stop",      &DRSContainer::ForceStop    )
-  .def( "start_collect",   &DRSContainer::StartCollect )
-  .def( "run_calibration", &DRSContainer::RunCalib     )
-  .def( "set_trigger",     &DRSContainer::SetTrigger   )
-  .def( "set_samples",     &DRSContainer::SetSamples   )
-  .def( "set_rate",        &DRSContainer::SetRate      )
+    // Operation functions
+    .def( "force_stop", &DRSContainer::ForceStop )
+    .def( "start_collect", &DRSContainer::StartCollect )
+    .def( "run_calibration", &DRSContainer::RunCalib )
+    .def( "set_trigger", &DRSContainer::SetTrigger )
+    .def( "set_samples", &DRSContainer::SetSamples )
+    .def( "set_rate", &DRSContainer::SetRate )
 
-  // Data extraction function (operation-like)
-  .def( "get_time_slice",  &DRSContainer::GetTimeArray )
-  .def( "get_waveform",    &DRSContainer::GetWaveform  )
-  .def( "get_waveformsum", &DRSContainer::WaveformSum  )
+    // Data extraction function (operation-like)
+    .def( "get_time_slice", &DRSContainer::GetTimeArray )
+    .def( "get_waveform", &DRSContainer::GetWaveform )
+    .def( "get_waveformsum", &DRSContainer::WaveformSum )
 
-  // Getting configurations (read-only operations)
-  .def( "get_trigger_channel",   &DRSContainer::TriggerChannel   )
-  .def( "get_trigger_direction", &DRSContainer::TriggerDirection )
-  .def( "get_trigger_level",     &DRSContainer::TriggerLevel     )
-  .def( "get_trigger_delay",     &DRSContainer::TriggerDelay     )
-  .def( "get_samples",           &DRSContainer::GetSamples       )
-  .def( "get_rate",              &DRSContainer::GetRate          )
-  .def( "is_available",          &DRSContainer::IsAvailable      )
-  .def( "is_ready",              &DRSContainer::IsReady          )
-  ;
+    // Getting configurations (read-only operations)
+    .def( "get_trigger_channel", &DRSContainer::TriggerChannel )
+    .def( "get_trigger_direction", &DRSContainer::TriggerDirection )
+    .def( "get_trigger_level", &DRSContainer::TriggerLevel )
+    .def( "get_trigger_delay", &DRSContainer::TriggerDelay )
+    .def( "get_samples", &DRSContainer::GetSamples )
+    .def( "get_rate", &DRSContainer::GetRate )
+    .def( "is_available", &DRSContainer::IsAvailable )
+    .def( "is_ready", &DRSContainer::IsReady );
 }
