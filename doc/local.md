@@ -1,29 +1,33 @@
 # Setting up a dummy server for software interaction testing
 
-For software testing, we have provided a docker file in this repository such
-that users can test the software capabilities of the server before fully
-deploying, to build the image file, run the following command on your machine:
+For software testing, we have provided a [`conda`][conda] environment file in
+this repository such that users can test the software capabilities of the
+server before fully deploying. We chose `conda` over a providing docker, as
+this allows for more flexible deployment when modifying the source code files,
+as allowing the modules to access the underlying hardware when required.
+
+
 
 ```bash
-docker buildx build --file tests/docker/Dockerfile --tag gantrymq   \
-       --network="host"  --platform ${PLATFORM}  --rm --load ./
+# Cloning the repository
+git clone https://github.com/UMDCMS/GantryMQ
+# Getting external dependencies
+bash GantryMQ/external/fetch_external.sh
+
+# Creating the base conda environment and loading the virtual environment
+conda env create --file GantryMQ/environment.yml
+conda activate gantry_mq_server
+
+# Compiling the required C++ code
+cd GantryMQ/ && 
+CXX=$(which g++) cmake ./ && CFLAGS="-I$CONDA_PREFIX/include" cmake --build ./
+cd ../
 ```
 
-The `${PLATFORM}` variable should match what machine you are running the test on
-(tested using `linux/amd64`).
+This should be enough to compile everything required. At this point, you will
+be able to host a server using the commands given in the main
+[README.md](../README.md), though certain hardware will likely not work. In
+this case, you might want to set up a dummy version of the hardware interfaces
+for testing.
 
-To start up the docker session run the command:
-
-```bash
-docker run -it                                              \
-       --network="host"                                     \
-       --platform ${PLATFORM}                               \
-       --mount type=bind,source="${PWD}",target=/srv        \
-       --privileged -v /dev/video1:/dev/video1              \
-       gantrymq:latest                                      \
-       /bin/bash --init-file "/srv/tests/docker/bashrc.sh"
-```
-
-Notice that if you are running in docker, it is likely that most of the hardware
-will not function, and is not strictly a bug in the system. If you want to test
-the camera device, modify the exposed device.
+[conda]: https://conda.io/projects/conda/en/latest/index.html

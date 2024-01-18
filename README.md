@@ -50,10 +50,10 @@ Notice that you will need to reload the Python virtual environment every time.
 
 ### Locally on the server machine
 
-Once the server-side software is installed, we can test the hardware interaction
-on the server machine to make sure everything is working nominally on the server
-side. The following commands will likely not work in the docker session. The
-commands here also assume that you have access to the various hardware
+Once the server-side software is installed, we can test the hardware
+interaction on the server machine to make sure everything is working nominally
+on the server side. The following commands will likely not work in the testing
+session, as they assume that you have access to the various hardware
 interfaces. You may also need to modify the access addresses and pins to match
 whatever hardware is attached to your system.
 
@@ -86,9 +86,9 @@ python src/gmqclient/zmq_client.py
 
 #### Testing the various control systems
 
-Currently implemented systems include `gcoder`, `camera`, `drs`, `rigol`, `HVLV`
-and `SenAUX`. Make sure that the connected hardware is visible to the server
-before attempting to run the following instructions.
+Implemented systems include `gcoder`, `camera`, `drs`, `rigol`, `HVLV` and
+`SenAUX`. Make sure that the connected hardware is visible to the server before
+attempting to run the following instructions.
 
 ```bash
 # Server-side
