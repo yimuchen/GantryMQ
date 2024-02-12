@@ -10,7 +10,7 @@ dependencies:
   - fmt=10.0.0
   - pybind11
   # Required for a self-consistent version of glibc
-  - sysroot_linux-64=2.28 # TODO: genernalize this for other OS versions
+  # - sysroot_linux-64=2.28 # Can be fixed by specifying LD_LIBRARY_PATH
 
   - wxwidgets # Requirments for DRS binding
   - libusb
