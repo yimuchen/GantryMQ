@@ -1,0 +1,23 @@
+name: gantry_mq_server
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # C/C++ requirements, pinning to older requirements for now
+  - cmake=3.27.9
+  - boost=1.82
+  - gxx=12
+  - fmt=10.0.0
+  - pybind11
+  - wxwidgets # Requirments for DRS binding
+  - libusb
+  - libusb-compat
+  # Setting up python dependencies required for server side objects
+  - python=3.10
+  - pyzmq
+  - scipy
+  - pyvisa-py
+  - zeroconf
+  - pyusb
+
+

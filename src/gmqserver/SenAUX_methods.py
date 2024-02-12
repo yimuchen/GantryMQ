@@ -1,12 +1,11 @@
-from zmq_server import HWContainer
+import json
+import logging
+from typing import Dict, Tuple, Union
 
+import numpy
 from modules.gpio import gpio
 from modules.i2c_ads1115 import i2c_ads1115
-
-import logging
-import json
-import numpy
-from typing import Optional, Dict, Union, Tuple
+from zmq_server import HWContainer
 
 
 def reset_senaux_devices(
@@ -21,18 +20,18 @@ def reset_senaux_devices(
     if not isinstance(device_json, dict):
         raise ValueError(f"Unknown type [{type(device_json)}] used for initialization")
 
-    ## {
-    ##     "SENAUX_PD1_GPIO": "22",
-    ##     "SENAUX_PD2_GPIO": "23",
-    ##     "SENAUX_F1_GPIO": "20",
-    ##     "SENAUX_F2_GPIO": "21",
-    ##     "SENAUX_ADC": {
-    ##         "ADDR": "0x49",
-    ##         "C1": "10000/0",
-    ##         "C2": "10000/0",
-    ##         "C2": "10000/0",
-    ##     },
-    ## }
+    # {
+    #     "SENAUX_PD1_GPIO": "22",
+    #     "SENAUX_PD2_GPIO": "23",
+    #     "SENAUX_F1_GPIO": "20",
+    #     "SENAUX_F2_GPIO": "21",
+    #     "SENAUX_ADC": {
+    #         "ADDR": "0x49",
+    #         "C1": "10000/0",
+    #         "C2": "10000/0",
+    #         "C2": "10000/0",
+    #     },
+    # }
     def add_gpio_dev(s, dev_name):
         assert s in device_json
         if "DUMMY" in s:
@@ -147,8 +146,9 @@ _senaux_operation_cmds_ = {
 }
 
 if __name__ == "__main__":
-    from zmq_server import HWControlServer, make_zmq_server_socket
     import argparse
+
+    from zmq_server import HWControlServer, make_zmq_server_socket
 
     parser = argparse.ArgumentParser("SenAUX_Testing")
     parser.add_argument("device_json", type=str, nargs=1, help="Path to device json")

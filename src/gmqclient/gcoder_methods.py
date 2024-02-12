@@ -1,6 +1,4 @@
-## Direct methods to be overloaded onto the client
-from typing import Tuple, Dict, List
-
+# Direct methods to be overloaded onto the client
 import logging
 import time
 
@@ -12,7 +10,7 @@ def register_method_for_client(cls):
         "reset_gcoder_device",
         "run_gcode",
         "set_speed_limit",
-        ## "move_to", special method!!
+        # "move_to", special method!! over loaded to something else
         "enable_stepper",
         "disable_stepper",
         "send_home",
@@ -37,8 +35,9 @@ def register_method_for_client(cls):
 
 
 if __name__ == "__main__":
-    from zmq_client import HWControlClient
     import argparse
+
+    from zmq_client import HWControlClient
 
     parser = argparse.ArgumentParser(
         "gcoder_methods.py", "Simple test program to for interacting with gcoder device"

@@ -3,14 +3,14 @@
 Controlling a Rigol power supply using pyvisa
 
 """
-from zmq_server import HWContainer
-
-import logging
-import pyvisa
-import time
-import usb.core
-import os
 import fcntl
+import logging
+import os
+import time
+
+import pyvisa
+import usb.core
+from zmq_server import HWContainer
 
 
 class RigolPS(object):
@@ -47,14 +47,14 @@ class RigolPS(object):
         """Thin wrapper for write to reset connection"""
         try:
             self.device.write(msg)
-        except ValueError as err:
+        except ValueError:
             self.__reset_usb()
             return self._write(msg)
 
     def _query(self, msg):
         try:
             return self.device.query(msg)
-        except ValueError as err:
+        except ValueError:
             self.__reset_usb()
             return self._query(msg)
 
@@ -118,7 +118,7 @@ class RigolPS(object):
         return self.get_voltage(2)
 
 
-## Methods for interacting with the the client object
+# Methods for interacting with the the client object
 
 
 def reset_rigolps_device(logger: logging.Logger, hw: HWContainer):
@@ -170,7 +170,7 @@ if __name__ == "__main__":
         telemetry_cmds=_rigol_telemetry_cmds_,
         operation_cmds=_rigol_operation_cmds_,
     )
-    reset_rigolps_devices(server.logger, server.hw)
+    reset_rigolps_device(server.logger, server.hw)
 
     # Running the server
     server.run_server()

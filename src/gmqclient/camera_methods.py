@@ -1,7 +1,7 @@
-## Direct methods to be overloaded onto the client
-from typing import Tuple, Dict, List
-
+# Direct methods to be overloaded onto the client
 import logging
+from typing import Dict, List, Tuple
+
 import cv2
 import numpy
 import scipy
@@ -203,8 +203,8 @@ def _contour_area(contour: numpy.ndarray) -> int:
 
 def _sharpness(img: numpy.ndarray, contour: numpy.ndarray) -> (float, float):
     """
-    Calculating the sharpness measure of an image in the region defined around a
-    contour
+    Calculating the sharpness measure of an image in the region defined around
+    a contour
     """
     img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
