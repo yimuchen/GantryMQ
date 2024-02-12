@@ -4,11 +4,14 @@ channels:
   - defaults
 dependencies:
   # C/C++ requirements, pinning to older requirements for now
-  - cmake=3.27.9
+  - cmake=3.27
   - boost=1.82
   - gxx=12
   - fmt=10.0.0
   - pybind11
+  # Required for a self-consistent version of glibc
+  - sysroot_linux-64=2.28 # TODO: genernalize this for other OS versions
+
   - wxwidgets # Requirments for DRS binding
   - libusb
   - libusb-compat
