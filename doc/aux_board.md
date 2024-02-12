@@ -184,9 +184,9 @@ python # Start the python shell in the client side software
 
 ### The following can them be whatever instruction you are interested in.
 >>> client.hv_enable() #
->>> client.set_lv_bias(554) # Units in mV.
+>>> client.set_lv_bias(554) # Units in MV.
 >>> client.get_lv_mv() #
-553.4 ## Printing units in mV
+553.4 ## Printing units in MV
 ```
 
 [SensAUXBoard]: https://github.com/UMDCMS/SiPMCalibHW/tree/main/_manual#auxillary-monitor-and-power-driving-hat-board
