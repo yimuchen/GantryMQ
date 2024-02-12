@@ -1,24 +1,21 @@
-import sys
 import os
+import sys
 
 if sys.version_info.major < 3:
     import warnings
 
     warnings.warn("Only supports python3!")
 
-# Loading all the various methods
-from zmq_server import HWContainer, HWControlServer, make_zmq_server_socket
-import camera_methods
-import gcoder_methods
-import drs_methods
-import rigol_methods
-import HVLV_methods
-import SenAUX_methods
-
-
-from typing import Optional
 import logging
 
+import camera_methods
+import drs_methods
+import gcoder_methods
+import HVLV_methods
+import rigol_methods
+import SenAUX_methods
+# Loading all the various methods
+from zmq_server import HWContainer, HWControlServer, make_zmq_server_socket
 
 if __name__ == "__main__":
     import argparse

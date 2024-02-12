@@ -1,12 +1,11 @@
-from zmq_server import HWContainer
+import json
+import logging
+from typing import Dict, Union
 
 from modules.gpio import gpio
 from modules.i2c_ads1115 import i2c_ads1115
 from modules.i2c_mcp4725 import i2c_mcp4725
-
-import logging
-import json
-from typing import Optional, Dict, Union
+from zmq_server import HWContainer
 
 
 def reset_hvlv_devices(
@@ -115,8 +114,8 @@ def get_hv_control_mv(logger: logging.Logger, hw: HWContainer) -> float:
 
 
 def get_lv_mv(logger: logging.Logger, hw: HWContainer) -> float:
-    ## TODO: Cannot read this due to hardware design flaw
-    # Using DAC register value as a work around
+    # TODO: Cannot read this due to hardware design flaw. Using DAC register
+    # value as a work around
     if isinstance(hw.hvlv_adc, i2c_ads1115) and False:
         return hw.hvlv_adc.read_mv(2, i2c_ads1115.ADS_RANGE_4V)
     else:
@@ -150,8 +149,9 @@ _hvlv_operation_cmds_ = {
 }
 
 if __name__ == "__main__":
-    from zmq_server import HWControlServer, make_zmq_server_socket
     import argparse
+
+    from zmq_server import HWControlServer, make_zmq_server_socket
 
     parser = argparse.ArgumentParser("HVLV_Testing")
     parser.add_argument("device_json", type=str, nargs=1, help="Path to device json")

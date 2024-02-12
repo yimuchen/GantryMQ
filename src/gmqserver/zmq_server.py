@@ -1,9 +1,9 @@
-from typing import Dict
-import zmq
-import json
-import pickle
-import logging
 import collections
+import logging
+import pickle
+from typing import Dict
+
+import zmq
 
 
 def _collapse_str_(x: str):
@@ -48,18 +48,16 @@ class HWControlServer:
         self,
         socket: zmq.Socket,
         logger: logging.Logger,
-        # Simple container for all the hw instances that is needed to be used to
-        # run the server instance. This allows for a partial server (only hosting
-        # some of the hardware capabilities to be spawned for testing)
+        # Simple container for all the hw instances that is needed to be used
+        # to run the server instance. This allows for a partial server ---
+        # servers only hosting some of the hardware capabilities --- to be
+        # spawned for testing.
         hw: HWContainer,
-        # Dictionary for the exposed function name and the method to call for the
-        # for additional method handling. All functions listed under this method
-        # should follow the convention:
+        # Dictionary for the exposed function name and the method to call for
+        # the for additional method handling. All functions listed under this
+        # method should follow the convention:
         #
         # Func_Name(logger, hw, **kwargs).
-        #
-        # And function outputs should be handled by the logger instance. This allows
-        # for the message to be passed seamlessly to the.
         #
         # This allows for arbitrary methods to be carried out on the various
         # methods. This allows for the logging of the method.
@@ -154,8 +152,8 @@ class HWControlServer:
                 )
 
             except KeyboardInterrupt or InterruptedError:
-                # Allow keyboard interaction and stop signals to interrupt server
-                # operation
+                # Allow keyboard interaction and stop signals to interrupt
+                # server operation
                 break
 
             except Exception as err:
@@ -179,8 +177,9 @@ class HWControlServer:
                 _collapse_str_(
                     f"""
                     Claiming operator id from existing client
-                    [{self._operator_id}]! This may cause the existing client to
-                    misbehave unless reclaimed."""
+                    [{self._operator_id}]! This may cause the existing client
+                    to misbehave unless reclaimed.
+                    """
                 )
             )
         self._operator_id = client_id
@@ -188,11 +187,11 @@ class HWControlServer:
     def release_operator(self, client_id):
         if self._operator_id is not None and self._operator_id != client_id:
             raise RuntimeError(
-                __collapse_str(
+                _collapse_str_(
                     f"""
-          Release can only be called by the operator who has claimed this
-          message! Current operator is [{self._operator_id}]
-          """
+                    Release can only be called by the operator who has claimed
+                    this message! Current operator is [{self._operator_id}]
+                    """
                 )
             )
         else:

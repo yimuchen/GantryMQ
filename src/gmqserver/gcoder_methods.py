@@ -1,14 +1,14 @@
-from zmq_server import HWContainer
-from modules.gcoder import gcoder
-
-from typing import Tuple, List
 import logging
+from typing import Tuple
+
+from modules.gcoder import gcoder
+from zmq_server import HWContainer
 
 
 class _DummyGantry_:
     """
-    Dummy gantry which allows for testing gantry controls without an actual gantry
-    control device attached.
+    Dummy gantry which allows for testing gantry controls without an actual
+    gantry control device attached.
     """
 
     def __init__(self):
@@ -43,22 +43,6 @@ class _DummyGantry_:
 
     def in_motion(self):
         return False
-
-        # Defining functions for gantry operation
-        for gantry_method in []:
-            GantryServer.register_gantry_passthrough(gantry_method)
-            self.register_operation_method(gantry_method)
-        # Defining functions for gantry telemetry monitoring
-        for gantry_method in [
-            "get_settings",
-            "in_motion",
-        ]:
-            GantryServer.register_gantry_passthrough(gantry_method)
-            self.register_telemetry_method(gantry_method)
-        # Methods for accessing the step only access
-        self.register_telemetry_method("get_coord")
-        self.register_telemetry_method("get_current_coord")
-        self.register_telemetry_method("get_speed")
 
 
 """
