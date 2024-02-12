@@ -18,15 +18,13 @@ if(DEFINED ENV{CONDA_PREFIX})
     message(STATUS "conda environment detected")
     message(STATUS "Adding explicit conda path " $ENV{CONDA_PREFIX}/include)
     add_compile_options("-I$ENV{CONDA_PREFIX}/include")
-    add_compile_options("-I/data/users/yichen/miniconda3/envs/gantry_mq_server/include")
-    # some more commands
+    add_compile_options("-I$ENV{CONDA_PREFIX}/include/python3.10")
 endif()
 
 ## Finding common required binary
-find_package(PythonLibs    3 REQUIRED)
-find_package(PythonInterp  3 REQUIRED)
-find_package(pybind11 CONFIG REQUIRED)
-find_package(fmt             REQUIRED)
+find_package(Python 3.10 EXACT COMPONENTS Interpreter Development)
+find_package(pybind11   CONFIG REQUIRED)
+find_package(fmt               REQUIRED)
 
 # The Picoscope library, this assumes that the interface has been added to the
 # external directory
