@@ -20,7 +20,9 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        "deploy.py", "Setting up server with the required hardware"
+        "deploy.py",
+        "Setting up server with the required hardware",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "--port", type=int, default=8989, help="Port to run the server on"
