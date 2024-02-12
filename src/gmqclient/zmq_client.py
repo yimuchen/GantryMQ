@@ -1,11 +1,10 @@
+import logging
+import os
+import pickle
+from socket import gethostname
 from typing import Optional
 
 import zmq
-import json
-import os
-import logging
-import pickle
-from socket import gethostname
 
 
 class HWControlClient:
@@ -19,13 +18,13 @@ class HWControlClient:
         if self.logger is None:  #
             self.logger = logging.getLogger(self.client_id)
 
-        # Allowing methods to appear directly as attributes instead of having to
-        # include the `_run_function` everywhere
+        # Allowing methods to appear directly as attributes instead of having
+        # to include the `_run_function` everywhere
         HWControlClient.register_client_method("release_operator")
         HWControlClient.register_client_method("claim_operator")
         HWControlClient.register_client_method("is_operator")
 
-    def __del__(self):
+    def close(self):
         # Always attempt to release the operator on exit. For methods in the
         # destructor, we cannot use the dynamically declared methods (for some
         # reason?)
@@ -72,7 +71,6 @@ class HWControlClient:
             self.logger.handle(record)
 
         # Casting the return type
-
         if "exception" in response:
             print(response["exception"], type(response["exception"]))
             raise response["exception"]
@@ -91,7 +89,7 @@ if __name__ == "__main__":
 
     try:
         client._run_function("operation_test", msg=3)
-    except Exception as err:
+    except Exception:
         print("Ran into error!")
         client.claim_operator()
         client._run_function("operation_test", msg=3)
@@ -101,3 +99,5 @@ if __name__ == "__main__":
         print(client._run_function("mytest"))
     except Exception as err:
         print(err)
+
+    client.close()

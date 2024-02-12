@@ -10,35 +10,30 @@
 #include <chrono>
 #include <thread>
 
-namespace hw
-{
+namespace hw {
 
 inline void
 sleep_nanoseconds( const unsigned x )
 {
-  std::this_thread::sleep_for( std::chrono::nanoseconds( x ));
+  std::this_thread::sleep_for( std::chrono::nanoseconds( x ) );
 }
-
 
 inline void
 sleep_microseconds( const unsigned x )
 {
-  std::this_thread::sleep_for( std::chrono::nanoseconds( x * 1000 ));
+  std::this_thread::sleep_for( std::chrono::nanoseconds( x * 1000 ) );
 }
-
 
 inline void
 sleep_milliseconds( const unsigned x )
 {
-  std::this_thread::sleep_for( std::chrono::nanoseconds( x * 1000 * 1000 ));
+  std::this_thread::sleep_for( std::chrono::nanoseconds( x * 1000 * 1000 ) );
 }
-
 
 inline void
 sleep_seconds( const unsigned x )
 {
-  std::this_thread::sleep_for( std::chrono::nanoseconds(
-                                 x * 1000 * 1000 * 1000 ));
+  std::this_thread::sleep_for( std::chrono::nanoseconds( x * 1000 * 1000 * 1000 ) );
 }
 
 }

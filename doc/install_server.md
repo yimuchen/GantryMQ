@@ -32,6 +32,14 @@ for you institute. The Raspberry Pi OS contains a GUI by default, so you can
 connect up the Raspberry Pi to a monitor and pull the required information
 before one can get the networking setup.
 
+## Download the repository
+
+```bash
+git clone https://github.com/UMDCMS/GantryMQ/
+```
+
+Keep track of where
+
 ## Setting up device permissions
 
 Modify the `/boot/config.txt` file so that I2C interfaces are available. Be sure
@@ -57,14 +65,6 @@ usermod -a -G drs ${USER}
 # usermod -a -G i2c ${USER}
 ```
 
-Then, copy the custom `udev` rules to expose device IDs to the various groups.
-
-```bash
-cp external/rules/drs.rules   /etc/udev/rules/
-## DO NOT ADD unless you are sure of what you are doing!!
-# cp external/rules/digi.rules  /etc/udev/rules/
-```
-
 Reboot the Raspberry Pi board to have everything take effect.
 
 ## Installing common C++ dependencies
@@ -82,7 +82,7 @@ sudo apt-get install git cmake python3-pybind11 pybind11-dev libfmt-dev
 sudo apt-get install libwxgtk3.2-dev libusb-dev libusb-1.0-0-dev
 
 # For python requirements
-sudo apt-get install pyzmq opencv-python python-scipy
+sudo apt-get install python3-zmq opencv-python python-scipy
 ```
 
 ## Installing and compiling the server software
@@ -97,17 +97,19 @@ cmake ./
 cmake --build ./
 ```
 
+Also, copy the custom `udev` rules to expose device IDs to the various groups.
+
+```bash
+cp external/rules/drs.rules   /etc/udev/rules/
+## DO NOT ADD unless you are sure of what you are doing!!
+# cp external/rules/digi.rules  /etc/udev/rules/
+```
+
 This should install all requirements. For a simpler operation, you might want to
 the following python path to the shell start up:
 
 ```bash
 export PYTHONPATH=$PYTHONPATH/$HOME/GantryMQ/src/gmqserver
 ```
-
-## Running the server
-
-For running the full server, a default server is provided in the
-`src/gmqserver/deploy.py` script. Which you can run directly or uses as a
-template to start the required server and hardware configurations.
 
 [rpiOS]: https://www.raspberrypi.com/software/

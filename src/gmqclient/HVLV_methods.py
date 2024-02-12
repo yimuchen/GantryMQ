@@ -1,7 +1,3 @@
-## Direct methods to be overloaded onto the client
-from typing import Tuple, Dict, List
-
-
 # Basic methods for accessing the various methods
 def register_method_for_client(cls):
     for method in [
@@ -22,10 +18,11 @@ def register_method_for_client(cls):
 
 
 if __name__ == "__main__":
-    from zmq_client import HWControlClient
     import argparse
     import logging
     import time
+
+    from zmq_client import HWControlClient
 
     parser = argparse.ArgumentParser(
         "HVLV_methods.py",
@@ -52,3 +49,4 @@ if __name__ == "__main__":
     client.set_lv_bias(0.554)
     client.get_lv_mv()
     time.sleep(1)
+    client.close()

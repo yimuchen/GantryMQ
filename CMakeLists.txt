@@ -12,15 +12,21 @@ add_compile_options("-Wno-undef")
 
 # General output settings
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_HOME_DIRECTORY}/modules )
-set(INCLUDE)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_HOME_DIRECTORY}/modules)
+if(DEFINED ENV{CONDA_PREFIX})
+    # Checking that this is in a conda environment if this is the case then
+    message(STATUS "conda environment detected")
+    message(STATUS "Adding explicit conda path " $ENV{CONDA_PREFIX}/include)
+    add_compile_options("-I$ENV{CONDA_PREFIX}/include")
+    add_compile_options("-I/data/users/yichen/miniconda3/envs/gantry_mq_server/include")
+    # some more commands
+endif()
 
 ## Finding common required binary
 find_package(PythonLibs    3 REQUIRED)
 find_package(PythonInterp  3 REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
 find_package(fmt             REQUIRED)
-
 
 # The Picoscope library, this assumes that the interface has been added to the
 # external directory

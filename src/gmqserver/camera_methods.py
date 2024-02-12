@@ -1,7 +1,8 @@
-from zmq_server import HWContainer
 import logging
+
 import cv2
 import numpy
+from zmq_server import HWContainer
 
 
 class _DummyCamera_(object):
