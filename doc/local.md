@@ -20,7 +20,7 @@ conda activate gantry_mq_server
 
 # Compiling the required C++ code
 cd GantryMQ/ && 
-CXX=$(which g++) LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:$LD_LIBRARY_PATH cmake ./ && cmake --build ./
+CXX=$(which g++) LD_LIBRARY_PATH=${CONDA_PREFIX}/lib cmake ./ && cmake --build ./
 cd ../
 ```
 
