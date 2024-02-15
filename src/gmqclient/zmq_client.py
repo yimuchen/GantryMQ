@@ -14,6 +14,9 @@ class HWControlClient:
         self.socket.connect(f"tcp://{host}:{port}")
         self.client_id = f"{gethostname()}@{os.getpid()}"
         self.logger = logger
+        # Storing the host/port information for debugging
+        self._host = host
+        self._port = port
 
         if self.logger is None:  #
             self.logger = logging.getLogger(self.client_id)
@@ -31,6 +34,8 @@ class HWControlClient:
         if self._run_function("is_operator"):
             self._run_function("release_operator")
         self.socket.close()
+        self._host = None
+        self._port = None
 
     @classmethod
     def register_client_method(
