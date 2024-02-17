@@ -32,13 +32,6 @@ for you institute. The Raspberry Pi OS contains a GUI by default, so you can
 connect up the Raspberry Pi to a monitor and pull the required information
 before one can get the networking setup.
 
-## Download the repository
-
-```bash
-git clone https://github.com/UMDCMS/GantryMQ/
-```
-
-Keep track of where
 
 ## Setting up device permissions
 
@@ -79,10 +72,10 @@ sudo apt-get update
 # For compiling the C/C++ libraries and python bindings
 sudo apt-get install git cmake python3-pybind11 pybind11-dev libfmt-dev
 # For compiling the DRS software
-sudo apt-get install libwxgtk3.2-dev libusb-dev libusb-1.0-0-dev
+sudo apt-get install libwxgtk3.0-gtk3-dev libusb-dev libusb-1.0-0-dev
 
 # For python requirements
-sudo apt-get install python3-zmq opencv-python python-scipy
+sudo apt-get install python3-zmq python3-opencv python3-scipy
 ```
 
 ## Installing and compiling the server software
@@ -100,16 +93,16 @@ cmake --build ./
 Also, copy the custom `udev` rules to expose device IDs to the various groups.
 
 ```bash
-cp external/rules/drs.rules   /etc/udev/rules/
+cp external/rules/drs.rules   /etc/udev/rules.d/
 ## DO NOT ADD unless you are sure of what you are doing!!
-# cp external/rules/digi.rules  /etc/udev/rules/
+# cp external/rules/digi.rules  /etc/udev/rules.d/
 ```
 
 This should install all requirements. For a simpler operation, you might want to
 the following python path to the shell start up:
 
 ```bash
-export PYTHONPATH=$PYTHONPATH/$HOME/GantryMQ/src/gmqserver
+export PYTHONPATH=${PYTHONPATH}:${HOME}/GantryMQ/src/gmqserver
 ```
 
 [rpiOS]: https://www.raspberrypi.com/software/
