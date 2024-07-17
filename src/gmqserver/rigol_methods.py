@@ -1,15 +1,12 @@
-"""
-
-Controlling a Rigol power supply using pyvisa
-
-"""
 import fcntl
 import logging
 import os
 import time
+from typing import Any, Dict
 
 import pyvisa
 import usb.core
+
 from zmq_server import HWContainer
 
 
@@ -152,25 +149,39 @@ _rigol_operation_cmds_ = {
     "set_rigol_led": set_rigol_led,
 }
 
+
+def init_by_config(logger: logging.Logger, hw, config: Dict[str, Any]):
+    """
+    Checking JSON configuration for rigol configurations
+    """
+    if "rigol_enable" in config and config["rigol_enable"]:
+        reset_rigolps_device(logger, hw)
+
+
 if __name__ == "__main__":
-    from zmq_server import HWControlServer, make_zmq_server_socket
+    from zmq_server import (
+        HWControlServer,
+        make_cmd_parser,
+        make_zmq_server_socket,
+        parse_cmd_args,
+    )
 
-    # Declaring a dummy device
-    hw = HWContainer()
+    parser = make_cmd_parser(__file__, "Test server for rigol operations")
+    config = parse_cmd_args(parser)
 
-    # Declaring logging to keep everything by default
+    # Setting logger to log everything
     logging.root.setLevel(logging.NOTSET)
     logging.basicConfig(level=logging.NOTSET)
 
     # Creating the server instance
     server = HWControlServer(
-        make_zmq_server_socket(8989),
+        make_zmq_server_socket(config["port"]),
         logger=logging.getLogger("TestRigolMethods"),
-        hw=hw,
+        hw=HWContainer(),
         telemetry_cmds=_rigol_telemetry_cmds_,
         operation_cmds=_rigol_operation_cmds_,
     )
-    reset_rigolps_device(server.logger, server.hw)
+    init_by_config(server.logger, server.hw, config)
 
     # Running the server
     server.run_server()

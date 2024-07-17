@@ -1,15 +1,16 @@
 import json
 import logging
-from typing import Dict, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 import numpy
+from zmq_server import HWContainer
+
 from modules.gpio import gpio
 from modules.i2c_ads1115 import i2c_ads1115
-from zmq_server import HWContainer
 
 
 def reset_senaux_devices(
-    logger: logging.Logger, hw: HWContainer, device_json: Union[str, Dict[str, str]]
+    logger: logging.Logger, hw: HWContainer, device_json: Union[str, Dict[str, Any]]
 ):
     """
     As multiple devices needs to exist, to avoid a verbose function, the input
@@ -145,17 +146,24 @@ _senaux_operation_cmds_ = {
     "senaux_pulse_f2": senaux_pulse_f2,
 }
 
+
+def init_by_config(logger: logging.Logger, hw: HWContainer, config: Dict[str, Any]):
+    if "SENAUX_ADC" in config:
+        reset_senaux_devices(logger, hw, config)
+
+
 if __name__ == "__main__":
-    import argparse
+    from zmq_server import (
+        HWControlServer,
+        make_cmd_parser,
+        make_zmq_server_socket,
+        parse_cmd_args,
+    )
 
-    from zmq_server import HWControlServer, make_zmq_server_socket
-
-    parser = argparse.ArgumentParser("SenAUX_Testing")
-    parser.add_argument("device_json", type=str, nargs=1, help="Path to device json")
-    args = parser.parse_args()
+    parser = make_cmd_parser("camera_methods.py", "Test server for camera operations")
+    config = parse_cmd_args(parser)
 
     # Declaring a dummy device
-    hw = HWContainer()
 
     # Declaring logging to keep everything by default
     logging.root.setLevel(logging.NOTSET)
@@ -165,11 +173,11 @@ if __name__ == "__main__":
     server = HWControlServer(
         make_zmq_server_socket(8989),
         logger=logging.getLogger("TestSenAUXMethods"),
-        hw=hw,
+        hw=HWContainer(),
         telemetry_cmds=_senaux_telemetry_cmds_,
         operation_cmds=_senaux_operation_cmds_,
     )
-    reset_senaux_devices(server.logger, server.hw, args.device_json[0])
+    init_by_config(server.logger, server.hw, config)
 
     # Running the server
     server.run_server()

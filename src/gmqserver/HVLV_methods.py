@@ -1,11 +1,12 @@
 import json
 import logging
-from typing import Dict, Union
+from typing import Any, Dict, Union
+
+from zmq_server import HWContainer
 
 from modules.gpio import gpio
 from modules.i2c_ads1115 import i2c_ads1115
 from modules.i2c_mcp4725 import i2c_mcp4725
-from zmq_server import HWContainer
 
 
 def reset_hvlv_devices(
@@ -25,29 +26,33 @@ def reset_hvlv_devices(
     #   "HV_DAC_ADDR": "0x64",
     #   "LV_DAC_ADDR": "0x65"
     # }
+
+    # First check everything is preset in the configuration
     assert "HV_ENABLE_GPIO" in device_json
-    if "DUMMY" in device_json["HV_ENABLE_GPIO"]:
-        hw.hv_gpio = None
-    else:
-        hw.hv_gpio = gpio(int(device_json["HV_ENABLE_GPIO"]), gpio.READ_WRITE)
-
     assert "HVLV_ADC_ADDR" in device_json
-    if "DUMMY" in device_json["HVLV_ADC_ADDR"]:
-        hw.hvlv_adc = None
-    else:
-        hw.hvlv_adc = i2c_ads1115(1, int(device_json["HVLV_ADC_ADDR"], base=16))
-
     assert "HV_DAC_ADDR" in device_json
-    if "DUMMY" in device_json["HV_DAC_ADDR"]:
-        hw.hv_dac = None
-    else:
-        hw.hv_dac = i2c_mcp4725(1, int(device_json["HV_DAC_ADDR"], base=16))
-
     assert "LV_DAC_ADDR" in device_json
-    if "DUMMY" in device_json["LV_DAC_ADDR"]:
-        hw.lv_dac = None
-    else:
-        hw.lv_dac = i2c_mcp4725(1, int(device_json["LV_DAC_ADDR"], base=16))
+
+    hw.hv_gpio = (
+        gpio(int(device_json["HV_ENABLE_GPIO"]), gpio.READ_WRITE)
+        if "DUMMY" not in device_json["HV_ENABLE_GPIO"]
+        else None
+    )
+    hw.hvlv_adc = (
+        i2c_ads1115(1, int(device_json["HVLV_ADC_ADDR"], base=16))
+        if "DUMMY" not in device_json["HVLV_ADC_ADDR"]
+        else None
+    )
+    hw.hv_dac = (
+        i2c_mcp4725(1, int(device_json["HV_DAC_ADDR"], base=16))
+        if "DUMMY" not in device_json["HV_DAC_ADDR"]
+        else None
+    )
+    hw.lv_dac = (
+        i2c_mcp4725(1, int(device_json["LV_DAC_ADDR"], base=16))
+        if "DUMMY" not in device_json["LV_DAC_ADDR"]
+        else None
+    )
 
 
 def hv_enable(logger: logging.Logger, hw: HWContainer):
@@ -148,17 +153,22 @@ _hvlv_operation_cmds_ = {
     "set_lv_mv": set_lv_mv,
 }
 
+
+def init_by_config(logger: logging.Logger, hw: HWContainer, config: Dict[str, Any]):
+    if "HV_ENABLE_GPIO" in config:
+        reset_hvlv_devices(logger, hw, config)
+
+
 if __name__ == "__main__":
-    import argparse
+    from zmq_server import (
+        HWControlServer,
+        make_cmd_parser,
+        make_zmq_server_socket,
+        parse_cmd_args,
+    )
 
-    from zmq_server import HWControlServer, make_zmq_server_socket
-
-    parser = argparse.ArgumentParser("HVLV_Testing")
-    parser.add_argument("device_json", type=str, nargs=1, help="Path to device json")
-    args = parser.parse_args()
-
-    # Declaring a dummy device
-    hw = HWContainer()
+    parser = make_cmd_parser("camera_methods.py", "Test server for camera operations")
+    config = parse_cmd_args(parser)
 
     # Declaring logging to keep everything by default
     logging.root.setLevel(logging.NOTSET)
@@ -166,13 +176,13 @@ if __name__ == "__main__":
 
     # Creating the server instance
     server = HWControlServer(
-        make_zmq_server_socket(8989),
+        make_zmq_server_socket(config["port"]),
         logger=logging.getLogger("TestHVLVMethods"),
-        hw=hw,
+        hw=HWContainer(),
         telemetry_cmds=_hvlv_telemetry_cmds_,
         operation_cmds=_hvlv_operation_cmds_,
     )
-    reset_hvlv_devices(server.logger, server.hw, args.device_json[0])
+    init_by_config(server.logger, server.hw, config)
 
     # Running the server
     server.run_server()

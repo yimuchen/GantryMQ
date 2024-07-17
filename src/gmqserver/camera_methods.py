@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Dict
 
 import cv2
 import numpy
@@ -31,7 +32,7 @@ def reset_camera_device(logger: logging.Logger, hw: HWContainer, dev_path: str):
     # Loading a dummy camera instance
 
 
-def get_frame(logger: logging.Logger, hw) -> numpy.ndarray:
+def get_frame(logger: logging.Logger, hw: HWContainer) -> numpy.ndarray:
     if isinstance(hw.camera_device, cv2.VideoCapture):
         if not hw.camera_device.isOpened():
             raise RuntimeError("Video capture device is not available")
@@ -46,11 +47,22 @@ def get_frame(logger: logging.Logger, hw) -> numpy.ndarray:
 _camera_telemetry_cmds_ = {"get_frame": get_frame}
 _camera_operation_cmds_ = {"reset_camera_device": reset_camera_device}
 
-if __name__ == "__main__":
-    from zmq_server import HWControlServer, make_zmq_server_socket
 
-    # Declaring a dummy device
-    hw = HWContainer()
+def init_by_config(logger: logging.Logger, hw: HWContainer, config: Dict[str, Any]):
+    if "camera_device" in config:
+        reset_camera_device(logger, hw, config["camera_device"])
+
+
+if __name__ == "__main__":
+    from zmq_server import (
+        HWControlServer,
+        make_cmd_parser,
+        make_zmq_server_socket,
+        parse_cmd_args,
+    )
+
+    parser = make_cmd_parser("camera_methods.py", "Test server for camera operations")
+    config = parse_cmd_args(parser)
 
     # Declaring logging to keep everything by default
     logging.root.setLevel(logging.NOTSET)
@@ -58,12 +70,13 @@ if __name__ == "__main__":
 
     # Creating the server instance
     server = HWControlServer(
-        make_zmq_server_socket(8989),
+        make_zmq_server_socket(config["port"]),
         logger=logging.getLogger("TestCameraMethod"),
-        hw=hw,
+        hw=HWContainer(),
         telemetry_cmds=_camera_telemetry_cmds_,
         operation_cmds=_camera_operation_cmds_,
     )
+    init_by_config(server.logger, server.hw, config)
 
     # Running the server
     server.run_server()
