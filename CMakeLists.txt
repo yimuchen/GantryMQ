@@ -22,7 +22,7 @@ if(DEFINED ENV{CONDA_PREFIX})
 endif()
 
 ## Finding common required binary
-find_package(Python 3.10 EXACT COMPONENTS Interpreter Development)
+find_package(Python 3   EXACT COMPONENTS Interpreter Development)
 find_package(pybind11   CONFIG REQUIRED)
 find_package(fmt               REQUIRED)
 
