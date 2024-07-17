@@ -1,4 +1,4 @@
-name: gantry_mq_server
+name: gantrymq_server
 channels:
   - conda-forge
   - defaults
@@ -16,7 +16,7 @@ dependencies:
   - libusb
   - libusb-compat
   # Setting up python dependencies required for server side objects
-  - python=3.10
+  - python=3.11
   - pyzmq
   - scipy
   - opencv
