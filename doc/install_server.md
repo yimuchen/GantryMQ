@@ -6,20 +6,20 @@ building the image from scratch using the standard tools.
 
 ## Preparing the base image
 
-The base image for the Raspberry Pi OS can be found [here][rpiOS], just follow
+The base image for the Raspberry Pi OS can be found \[here\]\[rpios\], just follow
 the main instructions here. Notice that this instruction assumes that you are
 using a Raspberry Pi 4.
 
 ### First page:
 
 - Device type: RASPBERRY PI 4
-- Operating system: Raspberry PI OS (64bit)
+- Operating system: Raspberry Pi OS (64bit)
 - Storage: "your SD card device path"
 
 ### Second page
 
 - Configuration:
-  - Enable ssh, and set default user name
+  - Enable ssh, and set default username
 
 At this point should be prompted to write the image to your SD card. This will
 take around 20 minutes to complete.
@@ -31,7 +31,6 @@ basis. Contact you institute IT to find what works best for the network settings
 for you institute. The Raspberry Pi OS contains a GUI by default, so you can
 connect up the Raspberry Pi to a monitor and pull the required information
 before one can get the networking setup.
-
 
 ## Setting up device permissions
 
@@ -52,6 +51,7 @@ changing `i2c` and `gpio` value **will** damage your device.
 groupadd -f -r drs
 usermod -a -G drs ${USER}
 ## DO NOT ADD!! unless you are sure of what you are doing!
+## This will allow your user to use hardware pins, and should not be used on personal machines!!
 # groupadd -f -r gpio
 # usermod -a -G gpio ${USER}
 # groupadd -f -r i2c
@@ -72,8 +72,7 @@ sudo apt-get update
 # For compiling the C/C++ libraries and python bindings
 sudo apt-get install git cmake python3-pybind11 pybind11-dev libfmt-dev
 # For compiling the DRS software
-sudo apt-get install libwxgtk3.0-gtk3-dev libusb-dev libusb-1.0-0-dev
-
+sudo apt-get install libwxgtk3.2-dev libusb-dev libusb-1.0-0-dev
 # For python requirements
 sudo apt-get install python3-zmq python3-opencv python3-scipy
 ```
@@ -93,16 +92,17 @@ cmake --build ./
 Also, copy the custom `udev` rules to expose device IDs to the various groups.
 
 ```bash
+cp gantrymq.service  $HOME/.config/systemd/user/gantrymq.service
+
 cp external/rules/drs.rules   /etc/udev/rules.d/
 ## DO NOT ADD unless you are sure of what you are doing!!
 # cp external/rules/digi.rules  /etc/udev/rules.d/
 ```
 
-This should install all requirements. For a simpler operation, you might want to
-the following python path to the shell start up:
+You will need to reboot for the all changes to take effect.
 
-```bash
-export PYTHONPATH=${PYTHONPATH}:${HOME}/GantryMQ/src/gmqserver
-```
-
-[rpiOS]: https://www.raspberrypi.com/software/
+Notice that this only includes the dependencies. As configurations will require
+knowledge of how the various hardware is connected. For the continued
+documentation of how to properly configure the software according to the
+hardware configuration, see the file ["server-side
+configuration"](./config_server.md).
