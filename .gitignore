@@ -1,6 +1,8 @@
 # Editing related files
 .vscode/
-
+.nvim/
+.rsync.json
+flake.lock
 
 # Build related files
 build/
