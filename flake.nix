@@ -21,7 +21,7 @@
           name = "Environment for editing";
           packages = [
             pkgs.cmake
-            pkgs.clangd # C++ language server
+            pkgs.clang # C++ language server
             pkgs.ruff # python formatter server
             (pkgs.python3.withPackages (ps: [
               ps.python-lsp-server # Language servers
@@ -38,9 +38,14 @@
             # C++ related tools
             pkgs.cmake
             pkgs.gcc
-
-            # Python language tools
-            (pkgs.python3.withPackages (ps: [ ps.pyvisa ps.pyzmq ps.opencv4 ]))
+            # C++ dependencies for DRS4 interface
+            pkgs.fmt
+            pkgs.wxGTK32
+            pkgs.libusb1
+            pkgs.libusb-compat-0_1
+            # Python tools
+            (pkgs.python3.withPackages
+              (ps: [ ps.pyvisa ps.pyzmq ps.opencv4 ps.pybind11 ps.pyusb ]))
           ];
         };
         client = pkgs.mkShell {
