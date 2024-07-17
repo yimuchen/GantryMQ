@@ -26,7 +26,7 @@ def create_drs_passthrough(method_name: str) -> None:
 _drs_operation_cmds_ = {}
 _drs_operation_cmds_.update(
     {
-        method_name: create_drs_passthrough(method_name)
+        "drs_" + method_name: create_drs_passthrough(method_name)
         for method_name in [
             "force_stop",
             "start_collection",
@@ -46,7 +46,7 @@ _drs_operation_cmds_.update(
 _drs_telemetry_cmds_ = {}
 _drs_telemetry_cmds_.update(
     {
-        method_name: create_drs_passthrough(method_name)
+        "drs_" + method_name: create_drs_passthrough(method_name)
         for method_name in [
             "get_time_slice",
             "get_waveform",
