@@ -5,7 +5,6 @@ if sys.version_info.major < 3:
 
     warnings.warn("Only supports python3!")
 
-import json
 import logging
 
 import src.gmqserver.camera_methods as camera_methods
