@@ -23,4 +23,4 @@ def register_method_for_client(cls):
         "is_available",
         "is_ready",
     ]:
-        cls.register_client_method(method)
+        cls.register_client_method("drs_" + method)

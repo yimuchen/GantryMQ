@@ -1,7 +1,9 @@
+import argparse
 import collections
+import json
 import logging
 import pickle
-from typing import Dict
+from typing import Any, Dict
 
 import zmq
 
@@ -24,7 +26,7 @@ class MemHandler(logging.Handler):
     routinely flushed.
     """
 
-    def __init__(self, capacity, level=logging.NOTSET):
+    def __init__(self, capacity: int, level: int = logging.NOTSET):
         super().__init__(level=level)
         self.record_list = collections.deque([], maxlen=capacity)
 
@@ -206,8 +208,46 @@ class HWControlServer:
         return f"This is a operation test! {msg}"
 
 
+def make_cmd_parser(file, desc) -> argparse.ArgumentParser:
+    """
+    Helper function for creating the common command line parser used for starting servers
+    """
+    parser = argparse.ArgumentParser(
+        file, desc, formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        "config",
+        type=str,
+        help="""
+        Path to the configuration JSON file. Read documentation at:
+        https://github.com/UMDCMS/GantryMQ/blob/master/doc/config_server.md For
+        more information.
+        """,
+    )
+    return parser
+
+
+def parse_cmd_args(parser) -> Dict[str, Any]:
+    """
+    Running the default argument parsing: checking that the configuration file
+    is a legal file with the port configuration.
+    """
+    args = parser.parse_args()
+    config = json.load(open(args.config, "r"))
+
+    # Checking the hard requirements
+    assert "port" in config, "Configuration [port] was not found in configuration"
+    assert isinstance(config["port"], int), "Configuration [port] was not of type int"
+    return config
+
+
 if __name__ == "__main__":
     # Declaring the device container
+    parser = make_cmd_parser(
+        "zmq_server.py",
+        "Spinning a dummy server to check ZMQ server functionality",
+    )
+    config = parse_cmd_args(parser)
 
     hw = HWContainer()
     # Declaring a dummy device
@@ -219,7 +259,7 @@ if __name__ == "__main__":
 
     # Creating the server instance
     server = HWControlServer(
-        make_zmq_server_socket(8989), logger=logging.getLogger("TestServer"), hw=hw
+        make_zmq_server_socket(config["port"]), logger=logging.getLogger("TestServer"), hw=hw
     )
 
     # Running the server

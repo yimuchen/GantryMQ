@@ -1,0 +1,9 @@
+name: gantrymq_client
+channels:
+  - conda-forge
+  - defaults
+default:
+  - python=3.11 # Pinning a python version
+  - pyzmq
+  - pip:
+    - -e ./GantryMQ
