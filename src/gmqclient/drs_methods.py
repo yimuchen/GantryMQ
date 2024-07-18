@@ -2,6 +2,7 @@
 
 # Basic methods for accessing the various methods
 def register_method_for_client(cls):
+    cls.register_client_method("reset_drs_device")
     for method in [
         # Operation methods
         "force_stop",
@@ -10,7 +11,6 @@ def register_method_for_client(cls):
         "set_trigger",
         "set_samples",
         "set_rate",
-        "reset_drs_device",
         # Telemetry methods
         "get_time_slice",
         "get_waveform",
