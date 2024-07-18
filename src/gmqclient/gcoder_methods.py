@@ -8,30 +8,30 @@ def register_method_for_client(cls):
     for method in [
         # Operation
         "reset_gcoder_device",
-        "run_gcode",
-        "set_speed_limit",
+        "gcoder_run_gcode",
+        "gcoder_set_speed_limit",
         # "move_to", special method!! over loaded to something else
-        "enable_stepper",
-        "disable_stepper",
-        "send_home",
+        "gcoder_enable_stepper",
+        "gcoder_disable_stepper",
+        "gcoder_send_home",
         # Telemetry
-        "get_settings",
-        "in_motion",
-        "get_coord",
-        "get_current_coord",
-        "get_speed",
+        "gcoder_get_settings",
+        "gcoder_in_motion",
+        "gcoder_get_coord",
+        "gcoder_get_current_coord",
+        "gcoder_get_speed",
     ]:
         cls.register_client_method(method)
 
-    cls.register_client_method("move_to", "_raw_move_to")
+    cls.register_client_method("gcoder_move_to", "_gcoder_raw_move_to")
 
     # Improved client-side move to to ensure motion is completed
     def _move_to_(self, x, y, z):
-        self._raw_move_to(x=x, y=y, z=z)
-        while self.in_motion():
+        self._gcoder_raw_move_to(x=x, y=y, z=z)
+        while self.gcoder_in_motion():
             time.sleep(0.01)
 
-    setattr(cls, "move_to", _move_to_)
+    setattr(cls, "gcoder_move_to", _move_to_)
 
 
 if __name__ == "__main__":
