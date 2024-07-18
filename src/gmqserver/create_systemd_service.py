@@ -10,6 +10,8 @@ WantedBy=default.target
 [Service]
 WorkingDirectory={base_dir}
 ExecStart=python run_server.py {config_path}
+StandardError=journal
+StandardOutput=journal
 
 [Unit]
 Description=Starting the gantry/periphary control message servers
