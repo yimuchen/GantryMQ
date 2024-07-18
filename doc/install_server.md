@@ -75,6 +75,8 @@ sudo apt-get install git cmake python3-pybind11 pybind11-dev libfmt-dev
 sudo apt-get install libwxgtk3.2-dev libusb-dev libusb-1.0-0-dev
 # For python requirements
 sudo apt-get install python3-zmq python3-opencv python3-scipy
+# Additional tools that can help with operations and configuration
+sudo apt-get install jq
 ```
 
 ## Installing and compiling the server software
