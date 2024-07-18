@@ -44,7 +44,7 @@ def get_frame(logger: logging.Logger, hw: HWContainer) -> numpy.ndarray:
         return numpy.array([])
 
 
-_camera_telemetry_cmds_ = {"get_frame": get_frame}
+_camera_telemetry_cmds_ = {"camera_get_frame": get_frame}
 _camera_operation_cmds_ = {"reset_camera_device": reset_camera_device}
 
 

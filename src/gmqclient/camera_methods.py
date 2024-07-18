@@ -9,7 +9,7 @@ import scipy
 
 # Basic methods for accessing the various methods
 def register_method_for_client(cls):
-    for method in ["reset_camera_device", "get_frame"]:
+    for method in ["reset_camera_device", "camera_get_frame"]:
         cls.register_client_method(method)
 
 
