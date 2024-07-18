@@ -1,8 +1,9 @@
 import logging
 from typing import Any, Dict, Tuple
 
-from modules.gcoder import gcoder
 from zmq_server import HWContainer
+
+from modules.gcoder import gcoder
 
 
 class _DummyGantry_:
@@ -82,7 +83,7 @@ def get_speed(logger, hw) -> Tuple[float]:
 _gcoder_operation_cmds_ = {}
 _gcoder_operation_cmds_.update(
     {
-        method_name: create_gantry_passthrough(method_name)
+        "gcoder_" + method_name: create_gantry_passthrough(method_name)
         for method_name in [
             "run_gcode",
             "set_speed_limit",
@@ -102,15 +103,15 @@ _gcoder_operation_cmds_.update(
 _gcoder_telemetry_cmds_ = {}
 _gcoder_telemetry_cmds_.update(
     {
-        method_name: create_gantry_passthrough(method_name)
+        "gcoder_" + method_name: create_gantry_passthrough(method_name)
         for method_name in ["get_settings", "in_motion"]
     }
 )
 _gcoder_telemetry_cmds_.update(
     {
-        "get_coord": get_coord,
-        "get_current_coord": get_current_coord,
-        "get_speed": get_speed,
+        "gcoder_get_coord": get_coord,
+        "gcoder_get_current_coord": get_current_coord,
+        "gcoder_get_speed": get_speed,
     }
 )
 
