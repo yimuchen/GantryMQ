@@ -1,8 +1,9 @@
-from zmq_server import HWContainer
-from modules.drs import drs
-
 import logging
-import numpy
+from typing import Any, Dict
+
+from zmq_server import HWContainer
+
+from modules.drs import drs
 
 
 def reset_drs_device(logger: logging.Logger, hw: HWContainer):
@@ -25,7 +26,7 @@ def create_drs_passthrough(method_name: str) -> None:
 _drs_operation_cmds_ = {}
 _drs_operation_cmds_.update(
     {
-        method_name: create_drs_passthrough(method_name)
+        "drs_" + method_name: create_drs_passthrough(method_name)
         for method_name in [
             "force_stop",
             "start_collection",
@@ -45,7 +46,7 @@ _drs_operation_cmds_.update(
 _drs_telemetry_cmds_ = {}
 _drs_telemetry_cmds_.update(
     {
-        method_name: create_drs_passthrough(method_name)
+        "drs_" + method_name: create_drs_passthrough(method_name)
         for method_name in [
             "get_time_slice",
             "get_waveform",
@@ -60,3 +61,37 @@ _drs_telemetry_cmds_.update(
         ]
     }
 )
+
+
+def init_by_config(logger: logging.Logger, hw: HWContainer, config: Dict[str, Any]):
+    if ("drs_enable" in config) and config["drs_enable"]:
+        reset_drs_device(logger, hw)
+
+
+if __name__ == "__main__":
+    from zmq_server import (
+        HWControlServer,
+        make_cmd_parser,
+        make_zmq_server_socket,
+        parse_cmd_args,
+    )
+
+    parser = make_cmd_parser("camera_methods.py", "Test server for DRS operations")
+    config = parse_cmd_args(parser)
+
+    # Declaring logging to keep everything by default
+    logging.root.setLevel(logging.NOTSET)
+    logging.basicConfig(level=logging.NOTSET)
+
+    # Creating the server instance
+    server = HWControlServer(
+        make_zmq_server_socket(config["port"]),
+        logger=logging.getLogger("TestCameraMethod"),
+        hw=HWContainer(),
+        telemetry_cmds=_drs_telemetry_cmds_,
+        operation_cmds=_drs_operation_cmds_,
+    )
+    init_by_config(server.logger, server.hw, config)
+
+    # Running the server
+    server.run_server()

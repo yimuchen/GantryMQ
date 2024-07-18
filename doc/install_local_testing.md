@@ -6,8 +6,6 @@ server before fully deploying. We chose `conda` over a providing docker, as
 this allows for more flexible deployment when modifying the source code files,
 as allowing the modules to access the underlying hardware when required.
 
-
-
 ```bash
 # Cloning the repository
 git clone https://github.com/UMDCMS/GantryMQ
@@ -15,7 +13,7 @@ git clone https://github.com/UMDCMS/GantryMQ
 bash GantryMQ/external/fetch_external.sh
 
 # Creating the base conda environment and loading the virtual environment
-conda env create --file GantryMQ/environment.yml
+conda env create --file GantryMQ/environment_server.yml
 conda activate gantry_mq_server
 
 # Compiling the required C++ code

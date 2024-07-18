@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple
+from typing import Any, Dict, Tuple
 
 from modules.gcoder import gcoder
 from zmq_server import HWContainer
@@ -115,11 +115,21 @@ _gcoder_telemetry_cmds_.update(
 )
 
 
-if __name__ == "__main__":
-    from zmq_server import HWControlServer, make_zmq_server_socket
+def init_by_config(logger: logging.Logger, hw: HWContainer, config: Dict[str, Any]):
+    if "gcoder_device" in config:
+        reset_gcoder_device(logger, hw, config["gcoder_device"])
 
-    # Declaring a dummy device
-    hw = HWContainer()
+
+if __name__ == "__main__":
+    from zmq_server import (
+        HWControlServer,
+        make_cmd_parser,
+        make_zmq_server_socket,
+        parse_cmd_args,
+    )
+
+    parser = make_cmd_parser("camera_methods.py", "Test server for camera operations")
+    config = parse_cmd_args(parser)
 
     # Declaring logging to keep everything by default
     logging.root.setLevel(logging.NOTSET)
@@ -129,11 +139,11 @@ if __name__ == "__main__":
     server = HWControlServer(
         make_zmq_server_socket(8989),
         logger=logging.getLogger("TestGantryMethods"),
-        hw=hw,
+        hw=HWContainer(),
         telemetry_cmds=_gcoder_telemetry_cmds_,
         operation_cmds=_gcoder_operation_cmds_,
     )
-    reset_gcoder_device(server.logger, server.hw, "/dev/ttyUSB0")
+    init_by_config(server.logger, server.hw, config)
 
     # Running the server
     server.run_server()
