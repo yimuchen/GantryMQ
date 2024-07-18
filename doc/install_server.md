@@ -74,7 +74,7 @@ sudo apt-get install git cmake python3-pybind11 pybind11-dev libfmt-dev
 # For compiling the DRS software
 sudo apt-get install libwxgtk3.2-dev libusb-dev libusb-1.0-0-dev
 # For python requirements
-sudo apt-get install python3-zmq python3-opencv python3-scipy
+sudo apt-get install python3-zmq python3-opencv python3-scipy python3-pyvisa
 # Additional tools that can help with operations and configuration
 sudo apt-get install jq
 ```

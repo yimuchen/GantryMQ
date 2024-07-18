@@ -128,7 +128,8 @@ After preparing the configuration JSON file, you can start the server using the
 following command:
 
 ```bash
-PYTHONPATH=$PWD python src/gmqserver/run_server.py "your_config.json"
+cd src/gmqserver
+python run_server.py "your_config.json"
 ```
 
 This will start a server with all possible hardware control interfaces listed.
@@ -139,7 +140,8 @@ to control a certain subsystem (usually for testing). Then you can run the
 command:
 
 ```bash
-PYTHONPATH=$PWD python src/gmqserver/<hardware_method>.py "your_config.json"
+cd src/gmqserver
+python <hardware_method>.py "your_config.json"
 ```
 
 Notice that this should only be used for testing purposes.
@@ -155,9 +157,40 @@ jq -s 'add' config/server/port.json config/server/camera.json > config.json
 ## Running the server as a `systemd` service
 
 To keep the server running even after you have disconnected the SSH session,
-the recommended method is to run the server as a `systemd` service.
+the recommended method is to run the server as a `systemd` service. Services
+should only be used when the full system is fixed. Therefore, you should only
+use this method when you have a working full configuration.
 
-TO-BE-CONSTRUCTED
+Generate the service file using the following commands:
+
+```bash
+cd src/gmqserver
+python create_systemd_service.py "your_config.json"
+```
+
+This will place a copy of the appropriate files, in the desired location. You
+can then start/stop the service using the command:
+
+```bash
+systemctl --user start/stop gantrymq.service
+```
+
+Once the service is started, you can safely disconnect, and the service will be
+kept running until explicitly told to stop or if the Raspberry Pi is shutdown.
+Also note that once service files are created, you can start/stop the service
+immediate after logging in, no additional configuration will be needed.
+To quickly check the status of the service, you can run the command:
+
+```bash
+systemctl --user status gantrymq.service
+```
+
+For a more detailed log, including all passed message in case some device is
+causing issues, you can run the command:
+
+```bash
+journalctl --user-unit gantrymq
+```
 
 [ads1115]: https://www.ti.com/lit/ds/symlink/ads1115.pdf
 [hvlvboard]: https://github.com/UMDCMS/SiPMCalibHW/tree/main/_manual#the-highlow-voltage-control-and-monitoring-hat-style-board

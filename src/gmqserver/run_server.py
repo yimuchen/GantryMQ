@@ -7,15 +7,15 @@ if sys.version_info.major < 3:
 
 import logging
 
-import src.gmqserver.camera_methods as camera_methods
-import src.gmqserver.drs_methods as drs_methods
-import src.gmqserver.gcoder_methods as gcoder_methods
-import src.gmqserver.HVLV_methods as HVLV_methods
-import src.gmqserver.rigol_methods as rigol_methods
-import src.gmqserver.SenAUX_methods as SenAUX_methods
+import camera_methods as camera_methods
+import drs_methods as drs_methods
+import gcoder_methods as gcoder_methods
+import HVLV_methods as HVLV_methods
+import rigol_methods as rigol_methods
+import SenAUX_methods as SenAUX_methods
 
 # Loading all the various methods
-from src.gmqserver.zmq_server import (
+from zmq_server import (
     HWContainer,
     HWControlServer,
     make_cmd_parser,

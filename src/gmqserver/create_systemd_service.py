@@ -1,7 +1,7 @@
 import os
 import shutil
 
-from src.gmqserver.zmq_server import make_cmd_parser
+from zmq_server import make_cmd_parser
 
 # Template for what will be going into the
 template = """
@@ -9,8 +9,7 @@ WantedBy=default.target
 
 [Service]
 WorkingDirectory={base_dir}
-Environment=PYTHONPATH={base_dir}
-ExecStart=python src/gmqserver/run_server.py {config_path}
+ExecStart=python run_server.py {config_path}
 
 [Unit]
 Description=Starting the gantry/periphary control message servers
