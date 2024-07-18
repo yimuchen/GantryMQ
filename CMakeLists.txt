@@ -18,7 +18,9 @@ if(DEFINED ENV{CONDA_PREFIX})
     message(STATUS "conda environment detected")
     message(STATUS "Adding explicit conda path " $ENV{CONDA_PREFIX}/include)
     add_compile_options("-I$ENV{CONDA_PREFIX}/include")
-    add_compile_options("-I$ENV{CONDA_PREFIX}/include/python3.10")
+    add_compile_options("-I$ENV{CONDA_PREFIX}/include/python3.11")
+else()
+    add_compile_options("-I/usr/include/python3.11")
 endif()
 
 ## Finding common required binary
