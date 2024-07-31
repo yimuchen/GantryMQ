@@ -1,0 +1,12 @@
+{
+  "SENAUX_PD1_GPIO": "dummy",
+  "SENAUX_PD2_GPIO": "dummy",
+  "SENAUX_F1_GPIO": "dummy",
+  "SENAUX_F2_GPIO": "dummy",
+  "SENAUX_ADC": {
+    "ADDR": "dummy",
+    "C1": [10000, 0],
+    "C2": [10000, 0],
+    "C3": [10000, 0]
+  }
+}

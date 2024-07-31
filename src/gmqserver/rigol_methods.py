@@ -2,37 +2,52 @@ import fcntl
 import logging
 import os
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import pyvisa
 import usb.core
 
-from zmq_server import HWContainer
+if "GMQPACKAGE_IS_CLIENT" not in os.environ:
+    from zmq_server import HWBaseInstance
+
+else:
+    from gmqclient.server.zmq_server import HWBaseInstance
 
 
-class RigolPS(object):
+class RigolPS(HWBaseInstance):
     """
     Pure python object used for interacting with Rigol power supply over USB
     """
 
-    def __init__(self):
-        self.device: str = None
-        self.serial: str = None
-        self.vid: int = None  # Vendor ID
-        self.pid: int = None  # Product ID
-        self._reinitialize()
+    def __init__(self, name: str, logger: logging.Logger):
+        super().__init__(name, logger)
+        self.device: Optional[pyvisa.resources.Resource] = None
+        self.serial: str = "DP8G2318000"  # What did this number come from??
+        self.vid: Optional[int] = None  # Vendor ID
+        self.pid: Optional[int] = None  # Product ID
 
-    def _reinitialize(self, serial: str = "DP8G2318000"):
-        self.device = None
-        self.vid = None
-        self.did = None
-        self.serial = None
+    def is_initialized(self):
+        return self.device is not None
+
+    def reset_devices(self, config: Dict[str, Any]):
+        """Setting the USB device if the "rigo_enable" flag is set to true"""
+        # Closing everything
+        if self.is_initialized():
+            self.device.close()
+            self.device = None
+            self.vid = None
+            self.did = None
+
+        if "rigol_enable" in config and config["rigol_enable"]:
+            self.__connect_usb()
+
+    def __connect_usb(self):
+        """Connecting the"""
         rm = pyvisa.ResourceManager("@py")
         for res_str in rm.list_resources():
             _iface, _vid, _pid, _serial, _idx, _man = res_str.split("::")
-            if serial in _serial:
+            if self.serial in _serial:
                 self.device = rm.open_resource(res_str)
-                self.serial = _serial
                 self.vid = int(_vid, 10)
                 self.pid = int(_pid, 10)
                 time.sleep(0.1)
@@ -40,29 +55,12 @@ class RigolPS(object):
         if self.device is None:
             raise RuntimeError("Error, valid VISA address not found")
 
-    def _write(self, msg):
-        """Thin wrapper for write to reset connection"""
-        try:
-            self.device.write(msg)
-        except ValueError:
-            self.__reset_usb()
-            return self._write(msg)
-
-    def _query(self, msg):
-        try:
-            return self.device.query(msg)
-        except ValueError:
-            self.__reset_usb()
-            return self._query(msg)
-
     def __reset_usb(self):
         """
         Solution to PipeError
         https://github.com/pyvisa/pyvisa-py/issues/72
         https://gist.github.com/PaulFurtado/fce98aef890469f34d51
         """
-        print("Issue with connection, resetting USB connections")
-
         USBDEVFS_RESET = ord("U") << (4 * 2) | 20
 
         xdev = usb.core.find(idVendor=self.vid, idProduct=self.pid)
@@ -74,9 +72,26 @@ class RigolPS(object):
         finally:
             os.close(fd)
 
-        self._reinitialize(self.serial)  # Is this needed
+        self.__connect_usb()  # Is this needed
+
+    def _write(self, msg):
+        """Thin wrapper for write operation, reset connection if failed"""
+        try:
+            self.device.write(msg)
+        except ValueError:
+            self.__reset_usb()
+            return self._write(msg)
+
+    def _query(self, msg):
+        """Thing wrapper for read operation, resetting connection if failed"""
+        try:
+            return self.device.query(msg)
+        except ValueError:
+            self.__reset_usb()
+            return self._query(msg)
 
     def set_voltage(self, channel: int, value: float):
+        """Setting the volage value of specific channel, unit in V"""
         assert channel == 1 or channel == 2, "Channel can only be 1 or 2"
         if channel == 1:
             assert 0 <= value <= 60, "voltage value can only be 0-60"
@@ -91,11 +106,13 @@ class RigolPS(object):
         self._write("OUTP CH{c}, ON".format(c=channel))
 
     def get_voltage(self, channel: int) -> float:
+        """Getting the voltage of a channel"""
         assert channel == 1 or channel == 2, "Channel can only be 1 or 2"
         reading = self._query(":MEAS:ALL? CH{c}".format(c=channel))[:-1].split(",")
         return float(reading[0])
 
     def reset(self):
+        """Performing a soft reset of voltage values, no device connection will be reset"""
         self._write("*RST")
 
     """
@@ -103,59 +120,20 @@ class RigolPS(object):
     """
 
     def set_sipm(self, value: float):
+        """Setting SiPM bias voltage (assuming channel 1). Units in V"""
         self.set_voltage(1, value)
 
     def get_sipm(self) -> float:
+        """Getting SiPM bias voltage (assuming channel 1). Units in V"""
         return self.get_voltage(1)
 
-    def set_led(self, value: float):
+    def set_tb_led(self, value: float):
+        """Setting tileboard LED powering voltage (assuming channel 2). Units in V"""
         self.set_voltage(2, value)
 
-    def get_led(self) -> float:
+    def get_tb_led(self) -> float:
+        """Getting tileboard LED powering voltage (assuming channel 2). Units in V"""
         return self.get_voltage(2)
-
-
-# Methods for interacting with the the client object
-
-
-def reset_rigolps_device(logger: logging.Logger, hw: HWContainer):
-    hw.rigolps = RigolPS()
-
-
-def set_rigol_sipm(logger: logging.Logger, hw: HWContainer, value: float):
-    hw.rigolps.set_sipm(value)
-
-
-def set_rigol_led(logger: logging.Logger, hw: HWContainer, value: float):
-    hw.rigolps.set_led(value)
-
-
-def get_rigol_sipm(logger: logging.Logger, hw: HWContainer) -> float:
-    return hw.rigolps.get_sipm()
-
-
-def get_rigol_led(logger: logging.Logger, hw: HWContainer) -> float:
-    return hw.rigolps.get_led()
-
-
-_rigol_telemetry_cmds_ = {
-    "get_rigol_sipm": get_rigol_sipm,
-    "get_rigol_led": get_rigol_led,
-}
-
-_rigol_operation_cmds_ = {
-    "reset_rigolps_device": reset_rigolps_device,
-    "set_rigol_sipm": set_rigol_sipm,
-    "set_rigol_led": set_rigol_led,
-}
-
-
-def init_by_config(logger: logging.Logger, hw, config: Dict[str, Any]):
-    """
-    Checking JSON configuration for rigol configurations
-    """
-    if "rigol_enable" in config and config["rigol_enable"]:
-        reset_rigolps_device(logger, hw)
 
 
 if __name__ == "__main__":
@@ -177,11 +155,7 @@ if __name__ == "__main__":
     server = HWControlServer(
         make_zmq_server_socket(config["port"]),
         logger=logging.getLogger("TestRigolMethods"),
-        hw=HWContainer(),
-        telemetry_cmds=_rigol_telemetry_cmds_,
-        operation_cmds=_rigol_operation_cmds_,
     )
-    init_by_config(server.logger, server.hw, config)
 
     # Running the server
     server.run_server()

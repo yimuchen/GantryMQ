@@ -1,37 +1,60 @@
 # Direct methods to be overloaded onto the client
 import logging
 import time
+from typing import Any, Dict, Tuple
+
+from .zmq_client import HWClientInstance
 
 
-# Basic methods for accessing the various methods
-def register_method_for_client(cls):
-    for method in [
-        # Operation
-        "reset_gcoder_device",
-        "gcoder_run_gcode",
-        "gcoder_set_speed_limit",
-        # "move_to", special method!! over loaded to something else
-        "gcoder_enable_stepper",
-        "gcoder_disable_stepper",
-        "gcoder_send_home",
-        # Telemetry
-        "gcoder_get_settings",
-        "gcoder_in_motion",
-        "gcoder_get_coord",
-        "gcoder_get_current_coord",
-        "gcoder_get_speed",
-    ]:
-        cls.register_client_method(method)
+class GCoderDevice(HWClientInstance):
+    def __init__(self, name: str):
+        super().__init__(name)
 
-    cls.register_client_method("gcoder_move_to", "_gcoder_raw_move_to")
+    # Simple-wrapped Telemetry methods
+    def get_coord(self) -> Tuple[float, float, float]:
+        return self._wrap_method()
 
-    # Improved client-side move to to ensure motion is completed
-    def _move_to_(self, x, y, z):
-        self._gcoder_raw_move_to(x=x, y=y, z=z)
-        while self.gcoder_in_motion():
+    def get_current_coord(self) -> Tuple[float, float, float]:
+        return self._wrap_method()
+
+    def get_speed(self) -> Tuple[float, float, float]:
+        return self._wrap_method()
+
+    def get_settings(self) -> str:
+        return self._wrap_method()
+
+    def in_motion(self) -> bool:
+        return self._wrap_method()
+
+    # Simple wrapped operation methods
+    def reset_devices(self, config: Dict[str, Any]):
+        return self._wrap_method(config)
+
+    def run_gcoder(self, cmd: str) -> str:
+        return self._wrap_method(cmd)
+
+    def enable_stepper(self, x: bool, y: bool, z: bool):
+        return self._wrap_method(x, y, z)
+
+    def disable_stepper(self, x: bool, y: bool, z: bool):
+        return self._wrap_method(x, y, z)
+
+    def send_home(self, x: bool, y: bool, z: bool):
+        return self._wrap_method(x, y, z)
+
+    def set_speed_limit(self, x: float, y: float, z: float):
+        return self._wrap_method(x, y, z)
+
+    # Wrapped method for move_to
+    def _raw_move_to_(self, x: float, y: float, z: float):
+        return self.client.run_function(
+            hw_name=self.name, function_name="move_to", x=x, y=y, z=z
+        )
+
+    def move_to(self, x: float, y: float, z: float):
+        self._raw_move_to_(x, y, z)
+        while self.in_motion():
             time.sleep(0.01)
-
-    setattr(cls, "gcoder_move_to", _move_to_)
 
 
 if __name__ == "__main__":
@@ -54,7 +77,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Adding the additional methods
-    register_method_for_client(HWControlClient)
 
     logging.root.setLevel(1)
     logging.basicConfig(level=logging.NOTSET)

@@ -7,16 +7,15 @@ if sys.version_info.major < 3:
 
 import logging
 
-import camera_methods as camera_methods
-import drs_methods as drs_methods
-import gcoder_methods as gcoder_methods
-import HVLV_methods as HVLV_methods
-import rigol_methods as rigol_methods
-import SenAUX_methods as SenAUX_methods
+from camera_methods import CameraDevice
+from drs_methods import DRSDevice
+from gcoder_methods import GCoderDevice
+from HVLV_methods import HVLVDevice
+from rigol_methods import RigolPS
+from SenAUX_methods import SenAUXDevice
 
 # Loading all the various methods
 from zmq_server import (
-    HWContainer,
     HWControlServer,
     make_cmd_parser,
     make_zmq_server_socket,
@@ -36,49 +35,31 @@ if __name__ == "__main__":
     config = parse_cmd_args(parser)
 
     # Creating Objects required for server session
+    socket = make_zmq_server_socket(port=config["port"])
     logger = logging.getLogger("gmqserver@default")
-    hw = HWContainer
-    _telemetry_cmds_ = {}
-    _operation_cmds_ = {}
 
     server = HWControlServer(
-        make_zmq_server_socket(port=config["port"]),
-        logger=logging.getLogger("gmqserver@default"),
-        hw=hw,
-        telemetry_cmds={
-            **camera_methods._camera_telemetry_cmds_,
-            **gcoder_methods._gcoder_telemetry_cmds_,
-            **drs_methods._drs_telemetry_cmds_,
-            **HVLV_methods._hvlv_telemetry_cmds_,
-            **SenAUX_methods._senaux_telemetry_cmds_,
-            **rigol_methods._rigol_telemetry_cmds_,
-        },
-        operation_cmds={
-            **camera_methods._camera_operation_cmds_,
-            **gcoder_methods._gcoder_operation_cmds_,
-            **drs_methods._drs_operation_cmds_,
-            **HVLV_methods._hvlv_operation_cmds_,
-            **SenAUX_methods._senaux_operation_cmds_,
-            **rigol_methods._rigol_operation_cmds_,
-        },
+        socket=socket,
+        logger=logger,
+        hw_list=[
+            CameraDevice("camera", logger),
+            DRSDevice("drs", logger),
+            HVLVDevice("hvlv", logger),
+            GCoderDevice("gcoder", logger),
+            SenAUXDevice("senaux", logger),
+            RigolPS("rigol", logger),
+        ],
     )
 
     # Initializing interfaces defined in the configurations file
     # Loading objects if they are defined in the JSON
-    for mod, iname in [
-        (camera_methods, "camera"),
-        (gcoder_methods, "gcoder"),
-        (HVLV_methods, "HV/LV board devices"),
-        (SenAUX_methods, "Sensor auxiliary devices"),
-        (drs_methods, "DRS4"),
-        (rigol_methods, "Rigol methods"),
-    ]:
+    for hw_device in server.hw_list:
         try:
-            print(f"Initializing the {iname} interfaces...")
-            mod.init_by_config(server.logger, server.hw, config)
+            print(f"Initializing the {hw_device.name}|{type(hw_device)} interfaces...")
+            hw_device.reset_devices(config)
         except Exception as err:
             print(
-                f"Failed to initialize [{iname}]. Client may need to reconfigure {iname} interfaces"
+                f"Failed to initialize [{hw_device.name}|{type(hw_device)}]. Client may need to reconfigure {hw_device.name} interfaces"
             )
             print(">>> Original Error:", type(err), err)
 

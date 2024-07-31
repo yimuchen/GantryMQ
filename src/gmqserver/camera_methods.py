@@ -1,56 +1,67 @@
 import logging
-from typing import Any, Dict
+import os
+from typing import Any, Dict, List, Optional
 
 import cv2
 import numpy
-from zmq_server import HWContainer
+
+if "GMQPACKAGE_IS_CLIENT" not in os.environ:
+    from zmq_server import HWBaseInstance
+else:
+    from gmqclient.server.zmq_server import HWBaseInstance
 
 
-class _DummyCamera_(object):
-    """Dummy camera method"""
+class CameraDevice(HWBaseInstance):
+    def __init__(self, name: str, logger: logging.Logger):
+        super().__init__(name, logger)
+        self.device: Optional[cv2.VideoCapture] = None
 
-    pass
+    def is_initialized(self):
+        return True
 
+    def is_dummy(self):
+        return self.device is None
 
-def reset_camera_device(logger: logging.Logger, hw: HWContainer, dev_path: str):
-    if not hasattr(hw, "camera_device"):
-        hw.camera_device = None
+    def reset_devices(self, config: Dict[str, Any]):
+        # Closing everything
+        if isinstance(self.device, cv2.VideoCapture):
+            self.device.release()
+            self.device = None
 
-    if isinstance(hw.camera_device, cv2.VideoCapture):
-        hw.camera_device.release()
+        # Checking the configuration format
+        assert self.name + "_device_path" in config
+        dev_path = config[self.name + "_device_path"]
 
-    # Loading the camera instance into the data set
-    if "/dummy" not in dev_path:
-        hw.camera_device = cv2.VideoCapture(dev_path)
+        # Loading the camera instance into the data set
+        if "/dummy" not in dev_path:
+            self.device = cv2.VideoCapture(dev_path)
 
-        # Setting up the capture property
-        hw.camera_device.set(cv2.CAP_PROP_FRAME_WIDTH, 1240)
-        hw.camera_device.set(cv2.CAP_PROP_FRAME_HEIGHT, 1024)
-        hw.camera_device.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Always get latest frame
-        hw.camera_device.set(cv2.CAP_PROP_SHARPNESS, 0)  # Disable post processing
+            # Setting up the capture property
+            self.device.set(cv2.CAP_PROP_FRAME_WIDTH, 1240)
+            self.device.set(cv2.CAP_PROP_FRAME_HEIGHT, 1024)
+            self.device.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Always get latest frame
+            self.device.set(cv2.CAP_PROP_SHARPNESS, 0)  # Disable post processing
 
-    # Loading a dummy camera instance
+        # Loading a dummy camera instance
 
+    def get_frame(self) -> numpy.ndarray:
+        if isinstance(self.device, cv2.VideoCapture):
+            if not self.device.isOpened():
+                raise RuntimeError("Video capture device is not available")
+            ret, frame = self.device.read()
+            if not ret:
+                raise RuntimeError("Can't receive frame from capture device")
+            return frame
+        else:
+            return numpy.array([])
 
-def get_frame(logger: logging.Logger, hw: HWContainer) -> numpy.ndarray:
-    if isinstance(hw.camera_device, cv2.VideoCapture):
-        if not hw.camera_device.isOpened():
-            raise RuntimeError("Video capture device is not available")
-        ret, frame = hw.camera_device.read()
-        if not ret:
-            raise RuntimeError("Can't receive frame from capture device")
-        return frame
-    else:
-        return numpy.array([])
+    @property
+    def telemetry_methods(self) -> List[str]:
+        return ["get_frame"]
 
-
-_camera_telemetry_cmds_ = {"camera_get_frame": get_frame}
-_camera_operation_cmds_ = {"reset_camera_device": reset_camera_device}
-
-
-def init_by_config(logger: logging.Logger, hw: HWContainer, config: Dict[str, Any]):
-    if "camera_device" in config:
-        reset_camera_device(logger, hw, config["camera_device"])
+    @property
+    def operation_methods(self) -> List[str]:
+        return ["reset_devices"]
 
 
 if __name__ == "__main__":
@@ -67,16 +78,14 @@ if __name__ == "__main__":
     # Declaring logging to keep everything by default
     logging.root.setLevel(logging.NOTSET)
     logging.basicConfig(level=logging.NOTSET)
+    logger = logging.getLogger("TestCameraMethod")
 
     # Creating the server instance
     server = HWControlServer(
-        make_zmq_server_socket(config["port"]),
-        logger=logging.getLogger("TestCameraMethod"),
-        hw=HWContainer(),
-        telemetry_cmds=_camera_telemetry_cmds_,
-        operation_cmds=_camera_operation_cmds_,
+        socket=make_zmq_server_socket(config["port"]),
+        logger=logger,
+        hw=CameraDevice.init_by_config(logger, config),
     )
-    init_by_config(server.logger, server.hw, config)
 
     # Running the server
     server.run_server()

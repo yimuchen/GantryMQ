@@ -1,9 +1,15 @@
 import logging
-from typing import Any, Dict, Tuple
+import os
+from typing import Any, Dict, List, Tuple, Union
 
-from zmq_server import HWContainer
+if "GMQPACKAGE_IS_CLIENT" not in os.environ:
+    from zmq_server import HWBaseInstance
 
-from modules.gcoder import gcoder
+    from modules.gcoder import gcoder
+else:
+    from gmqclient.server.zmq_server import HWBaseInstance
+
+    gcoder = None
 
 
 class _DummyGantry_:
@@ -19,7 +25,7 @@ class _DummyGantry_:
         self.cx, self.cy, self.cz = 0.0, 0.0, 0.0
 
     def run_gcode(self, gcode: str) -> str:
-        return "Dummy run, do nothing"
+        return "Dummy gantry_system, do nothing"
 
     def set_speed_limit(self, x: float, y: float, z: float) -> None:
         self.vx, self.vy, self.vz = x, y, z
@@ -47,78 +53,100 @@ class _DummyGantry_:
 
 
 """
-Methods to be exposed to the gantry methods
+Main method allowing interactions with the server instance
 """
 
 
-def create_gantry_passthrough(method_name: str) -> None:
-    """Passing through the gantry device methods"""
+class GCoderDevice(HWBaseInstance):
+    def __init__(self, name: str, logger: logging.Logger):
+        super().__init__(name, logger)
+        self.device: Union[_DummyGantry_, gcoder, None] = None
 
-    def __passthrough_call__(logger, hw, *args, **kwargs):
-        return getattr(hw.gantry_device, method_name)(*args, **kwargs)
+    def is_initialized(self) -> bool:
+        return self.device is not None
 
-    return __passthrough_call__
+    def is_dummy(self) -> bool:
+        return isinstance(self.device, _DummyGantry_)
 
+    def reset_devices(self, config: Dict[str, Any]):
+        # Closing everything
+        del self.device
+        self.device = None
 
-def reset_gcoder_device(logger, hw, dev_path: str) -> None:
-    if "/dummy" not in dev_path:
-        hw.gantry_device = gcoder(dev_path)
-    else:
-        hw.gantry_device = _DummyGantry_()
+        assert "gcoder_device" in config
+        dev_path: str = config["gcoder_device"]
+        if "/dummy" not in dev_path:
+            self.device = gcoder(dev_path)
+        else:
+            self.device = _DummyGantry_()
 
+    # Telemetry methods
+    def get_coord(self) -> Tuple[float, float, float]:
+        """Getting the target motion coordinate. Units in mm"""
+        return self.device.opx, self.device.opy, self.device.opz
 
-def get_coord(logger, hw) -> Tuple[float]:
-    return hw.gantry_device.opx, hw.gantry_device.opy, hw.gantry_device.opz
+    def get_current_coord(self) -> Tuple[float, float, float]:
+        """Getting the current coordinate. Units in mm"""
+        return self.device.cx, self.device.cy, self.device.cz
 
+    def get_speed(self) -> Tuple[float, float, float]:
+        """Getting the motion speed. Units in mm/s"""
+        return self.device.vx, self.device.vy, self.device.vz
 
-def get_current_coord(logger, hw) -> Tuple[float]:
-    return hw.gantry_device.cx, hw.gantry_device.cy, hw.gantry_device.cz
+    def get_settings(self) -> str:
+        """Getting the configuration strings"""
+        return self.device.get_settings()
 
+    def in_motion(self) -> bool:
+        """Checking if the gantry is currently in motion"""
+        return self.device.in_motion()
 
-def get_speed(logger, hw) -> Tuple[float]:
-    return hw.gantry_device.vx, hw.gantry_device.vy, hw.gantry_device.vz
+    # Operation methods
+    def run_gcode(self, cmd: str) -> str:
+        """Running a direct gcoder command"""
+        return self.device.run_gcode(cmd)
 
+    def set_speed_limit(self, vx: float, vy: float, vz: float) -> None:
+        """Setting the motion speed. Unit speed in mm/s"""
+        return self.device.set_speed_limit(vx, vy, vz)
 
-# Pass through methods (see hardware/gcoder.cc pybind modules)
-_gcoder_operation_cmds_ = {}
-_gcoder_operation_cmds_.update(
-    {
-        "gcoder_" + method_name: create_gantry_passthrough(method_name)
-        for method_name in [
+    def move_to(self, x: float, y: float, z: float) -> None:
+        """Move to location. Unit in mm"""
+        return self.device.move_to(x, y, z)
+
+    def send_home(self, x: bool, y: bool, z: bool) -> None:
+        """Moving individual axis back to home positions"""
+        return self.send_home(x, y, z)
+
+    def enable_stepper(self, x: bool, y: bool, z: bool) -> None:
+        """Enabling the stepper motors for each axis"""
+        return self.device.enable_stepper(x, y, z)
+
+    def disable_stepper(self, x: bool, y: bool, z: bool) -> None:
+        """Disabling the stepper motors for each axis"""
+        return self.device.disable_stepper(x, y, z)
+
+    @property
+    def telemetry_methods(self) -> List[str]:
+        return [
+            "get_coord",
+            "get_current_coord",
+            "get_speed",
+            "get_settings",
+            "in_motion",
+        ]
+
+    @property
+    def operation_methods(self) -> List[str]:
+        return [
+            "reset_devices",
             "run_gcode",
             "set_speed_limit",
             "move_to",
+            "send_home",
             "enable_stepper",
             "disable_stepper",
-            "send_home",
         ]
-    }
-)
-_gcoder_operation_cmds_.update(
-    {
-        "reset_gcoder_device": reset_gcoder_device,
-    }
-)
-
-_gcoder_telemetry_cmds_ = {}
-_gcoder_telemetry_cmds_.update(
-    {
-        "gcoder_" + method_name: create_gantry_passthrough(method_name)
-        for method_name in ["get_settings", "in_motion"]
-    }
-)
-_gcoder_telemetry_cmds_.update(
-    {
-        "gcoder_get_coord": get_coord,
-        "gcoder_get_current_coord": get_current_coord,
-        "gcoder_get_speed": get_speed,
-    }
-)
-
-
-def init_by_config(logger: logging.Logger, hw: HWContainer, config: Dict[str, Any]):
-    if "gcoder_device" in config:
-        reset_gcoder_device(logger, hw, config["gcoder_device"])
 
 
 if __name__ == "__main__":
@@ -129,22 +157,21 @@ if __name__ == "__main__":
         parse_cmd_args,
     )
 
-    parser = make_cmd_parser("camera_methods.py", "Test server for camera operations")
+    parser = make_cmd_parser("gcoder_methods.py", "Test server for gcode operations")
     config = parse_cmd_args(parser)
 
     # Declaring logging to keep everything by default
     logging.root.setLevel(logging.NOTSET)
     logging.basicConfig(level=logging.NOTSET)
+    logger = logging.getLogger("TestGantryMethods")
 
     # Creating the server instance
     server = HWControlServer(
         make_zmq_server_socket(8989),
-        logger=logging.getLogger("TestGantryMethods"),
-        hw=HWContainer(),
-        telemetry_cmds=_gcoder_telemetry_cmds_,
-        operation_cmds=_gcoder_operation_cmds_,
+        logger=logger,
+        hw_list=[GCoderDevice("gcoder", logger)],
     )
-    init_by_config(server.logger, server.hw, config)
+    server.hw_list[0].reset_devices(server.logger, config)
 
     # Running the server
     server.run_server()
