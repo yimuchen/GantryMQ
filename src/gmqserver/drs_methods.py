@@ -163,11 +163,14 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.NOTSET)
     logger = logging.getLogger("TestCameraMethod")
 
+    drs = DRSDevice("drs", logger)
+    drs.reset_devices(config)
+
     # Creating the server instance
     server = HWControlServer(
         socket=make_zmq_server_socket(config["port"]),
         logger=logger,
-        hw=HWContainer(),
+        hw_list=[drs],
     )
 
     # Running the server

@@ -297,7 +297,7 @@ if __name__ == "__main__":
     config = parse_cmd_args(parser)
 
     class DummyHW(HWBaseInstance):
-        def __init__(self, name):
+        def __init__(self, name, logger):
             super().__init__(name)
             self.counter = 0
 
@@ -330,7 +330,7 @@ if __name__ == "__main__":
     server = HWControlServer(
         socket=make_zmq_server_socket(config["port"]),
         logger=logging.getLogger("TestServer"),
-        hw_list=[DummyHW("dummy")],
+        hw_list=[DummyHW("dummy", logging.getLogger("TestServer"))],
     )
 
     # Running the server

@@ -210,14 +210,17 @@ if __name__ == "__main__":
     # Declaring logging to keep everything by default
     logging.root.setLevel(logging.NOTSET)
     logging.basicConfig(level=logging.NOTSET)
+    logger = logging.getLogger("TestHVLVMethods")
+
+    hvlv = HVLVDevice("hvlv", logger)
+    hvlv.reset_devices(config)
 
     # Creating the server instance
     server = HWControlServer(
         socket=make_zmq_server_socket(config["port"]),
-        logger=logging.getLogger("TestHVLVMethods"),
-        hw=HWContainer(),
+        logger=logger,
+        hw_list=[hvlv],
     )
-    init_by_config(server.logger, server.hw, config)
 
     # Running the server
     server.run_server()

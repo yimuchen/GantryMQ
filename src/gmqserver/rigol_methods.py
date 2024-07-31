@@ -150,11 +150,16 @@ if __name__ == "__main__":
     # Setting logger to log everything
     logging.root.setLevel(logging.NOTSET)
     logging.basicConfig(level=logging.NOTSET)
+    logger = logging.getLogger("TestRigolMethods")
+
+    rigol = RigolPS("rigol", logger)
+    rigol.reset_devices(config)
 
     # Creating the server instance
     server = HWControlServer(
         make_zmq_server_socket(config["port"]),
-        logger=logging.getLogger("TestRigolMethods"),
+        logger=logger,
+        hw_list=[rigol],
     )
 
     # Running the server

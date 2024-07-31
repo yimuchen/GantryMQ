@@ -253,24 +253,3 @@ class CameraDevice(HWClientInstance):
         s4 = scipy.stats.moment(lap, axis=None, moment=4)
 
         return s2, s4
-
-
-if __name__ == "__main__":
-    from zmq_client import HWControlClient
-
-    # Adding the additional methods
-
-    logging.root.setLevel(1)
-    logging.basicConfig(level=logging.NOTSET)
-    client = HWControlClient("localhost", 8989)
-    client.reset_camera_device("/dev/video1")
-
-    # Testing the image processing
-    while True:
-        frame = client.get_frame()
-        cv2.imshow("frame", get_processed_image(frame))
-
-        if cv2.waitKey(1) == ord("q"):
-            break
-
-    client.close()

@@ -80,11 +80,13 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.NOTSET)
     logger = logging.getLogger("TestCameraMethod")
 
+    camera = CameraDevice("camera", logger)
+    camera.reset_devices(config)
     # Creating the server instance
     server = HWControlServer(
         socket=make_zmq_server_socket(config["port"]),
         logger=logger,
-        hw=CameraDevice.init_by_config(logger, config),
+        hw_list=camera,
     )
 
     # Running the server

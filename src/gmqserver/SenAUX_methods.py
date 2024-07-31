@@ -222,16 +222,18 @@ if __name__ == "__main__":
     # Declaring logging to keep everything by default
     logging.root.setLevel(logging.NOTSET)
     logging.basicConfig(level=logging.NOTSET)
+    logger = logging.getLogger("TestSenAUXMethods")
+
+    # Creating hardware controller
+    senaux = SenAUXDevice("senaux", logger)
+    senaux.reset_devices(config)
 
     # Creating the server instance
     server = HWControlServer(
-        make_zmq_server_socket(8989),
-        logger=logging.getLogger("TestSenAUXMethods"),
-        hw=HWContainer(),
-        telemetry_cmds=_senaux_telemetry_cmds_,
-        operation_cmds=_senaux_operation_cmds_,
+        make_zmq_server_socket(config["port"]),
+        logger=logger,
+        hw_list=[senaux],
     )
-    init_by_config(server.logger, server.hw, config)
 
     # Running the server
     server.run_server()

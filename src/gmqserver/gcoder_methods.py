@@ -171,7 +171,7 @@ if __name__ == "__main__":
         logger=logger,
         hw_list=[GCoderDevice("gcoder", logger)],
     )
-    server.hw_list[0].reset_devices(server.logger, config)
+    server.hw_list[0].reset_devices(config)
 
     # Running the server
     server.run_server()
