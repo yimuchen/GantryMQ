@@ -164,7 +164,7 @@ class HWControlServer(object):
 
         # Checking the hardware instance is initialized
         assert (
-            hw.is_initialized()
+            hw.is_initialized() or function_name == "reset_devices"
         ), f"Hardware <{hw.name}({type(hw)})> is not initialized"
         if function_name in hw.all_telemetry_methods:
             method = getattr(hw, function_name)
