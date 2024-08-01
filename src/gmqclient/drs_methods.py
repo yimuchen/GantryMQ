@@ -45,12 +45,12 @@ class DRSDevice(HWClientInstance):
 
     # All telemetry methods are simple passthrough methods
     @add_serverclass_doc(drs_methods.DRSDevice)
-    def get_time_slice(self) -> numpy.ndarray:
-        return self._wrap_method()
+    def get_time_slice(self, channel: int) -> numpy.ndarray:
+        return self._wrap_method(channel)
 
     @add_serverclass_doc(drs_methods.DRSDevice)
-    def get_waveform(self) -> numpy.ndarray:
-        return self._wrap_method()
+    def get_waveform(self, channel: int) -> numpy.ndarray:
+        return self._wrap_method(channel)
 
     @add_serverclass_doc(drs_methods.DRSDevice)
     def get_trigger_channel(self) -> int:
@@ -70,6 +70,10 @@ class DRSDevice(HWClientInstance):
 
     @add_serverclass_doc(drs_methods.DRSDevice)
     def get_samples(self) -> int:
+        return self._wrap_method()
+
+    @add_serverclass_doc(drs_methods.DRSDevice)
+    def get_rate(self) -> float:
         return self._wrap_method()
 
     @add_serverclass_doc(drs_methods.DRSDevice)
