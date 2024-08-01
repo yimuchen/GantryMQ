@@ -84,7 +84,7 @@ class DRSDevice(HWBaseInstance):
         return self.device.run_calibration()
 
     @property
-    def operation_methods(self):
+    def operation_methods(self) -> List[str]:
         return [
             "reset_devices",
             "set_trigger",
@@ -96,13 +96,15 @@ class DRSDevice(HWBaseInstance):
         ]
 
     # Telemetry methods
-    def get_time_slice(self) -> numpy.ndarray:
-        """Getting the time segmentations of the digitization methods"""
-        return self.device.get_time_slice()
+    def get_time_slice(self, channel: int) -> numpy.ndarray:
+        """Getting the time segmentations of the digitization methods. Units in ns"""
+        assert 0 <= channel <= 3
+        return self.device.get_time_slice(channel)
 
-    def get_waveform(self) -> numpy.ndarray:
-        """Getting the current stored buffer"""
-        return self.device.get_waveform()
+    def get_waveform(self, channel: int) -> numpy.ndarray:
+        """Getting the current stored buffer. Units in mV"""
+        assert 0 <= channel <= 3
+        return self.device.get_waveform(channel)
 
     def get_trigger_channel(self) -> int:
         """Getting the trigger channel"""
@@ -133,14 +135,14 @@ class DRSDevice(HWBaseInstance):
         return self.device.is_ready()
 
     @property
-    def telemetry_method(self) -> List[str]:
+    def telemetry_methods(self) -> List[str]:
         return [
             "get_time_slice",
-            "get_wavefrom",
+            "get_waveform",
             "get_trigger_channel",
             "get_trigger_direction",
             "get_trigger_level",
-            "get_Trigger_delay",
+            "get_trigger_delay",
             "get_samples",
             "get_rate",
             "is_ready",
