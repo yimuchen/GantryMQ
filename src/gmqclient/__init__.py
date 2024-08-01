@@ -1,28 +1,59 @@
+import logging
+
+# This must be loaded first
+from .zmq_client import HWControlClient, make_zmq_client_socket
+
+# Loading all the various methods
 from . import version
+from .camera_methods import CameraDevice
+from .drs_methods import DRSDevice
+from .gcoder_methods import GCoderDevice
+from .HVLV_methods import HVLVDevice
+from .SenAUX_methods import SenAUXDevice
+
 
 # Checking version
 __version__ = version.__version__
 
-import sys
 
-if sys.version_info.major < 3:
-    import warnings
+class GMQClient(HWControlClient):
+    """Default client that spawns on of each defined interface"""
 
-    warnings.warn("Only supports python3!")
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 8989,
+    ):
+        super().__init__(
+            socket=make_zmq_client_socket(host, port),
+            logger=logging.Logger("gmqclient"),
+            hw_list=[
+                CameraDevice("camera"),
+                DRSDevice("drs"),
+                GCoderDevice("gcoder"),
+                HVLVDevice("hvlv"),
+                SenAUXDevice("senaux"),
+            ],
+        )
 
-# Loading all the various methods
-from . import (HVLV_methods, SenAUX_methods, camera_methods, drs_methods,
-               gcoder_methods)
-from .zmq_client import HWControlClient
+    # Adding aliases to the various hardware clients. Using this syntax as
+    # it is nicer for static python analyzer for editors
+    @property
+    def camera(self) -> CameraDevice:
+        return self.hw_list[0]
 
+    @property
+    def drs(self) -> DRSDevice:
+        return self.hw_list[1]
 
-# Function for creating the default client with all method loaded
-def create_default_client(host: str = "localhost", port: int = 8989):
-    # Loading all methods define in the various modules
-    camera_methods.register_method_for_client(HWControlClient)
-    gcoder_methods.register_method_for_client(HWControlClient)
-    drs_methods.register_method_for_client(HWControlClient)
-    HVLV_methods.register_method_for_client(HWControlClient)
-    SenAUX_methods.register_method_for_client(HWControlClient)
+    @property
+    def gcoder(self) -> GCoderDevice:
+        return self.hw_list[2]
 
-    return HWControlClient(host, port)
+    @property
+    def hvlv(self) -> HVLVDevice:
+        return self.hw_list[3]
+
+    @property
+    def senaux(self) -> SenAUXDevice:
+        return self.hw_list[4]
