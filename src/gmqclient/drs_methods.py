@@ -1,3 +1,5 @@
+from typing import Any, Dict
+
 import numpy
 
 from .server import drs_methods
@@ -9,6 +11,10 @@ class DRSDevice(HWClientInstance):
         super().__init__(name)
 
     # Most operation methods are simple pass-through methods
+    @add_serverclass_doc(drs_methods.DRSDevice)
+    def reset_devices(self, config: Dict[str, Any]):
+        return self._wrap_method(config)
+
     @add_serverclass_doc(drs_methods.DRSDevice)
     def set_trigger(self, channel: int, level: float, direction: int, delay: float):
         return self._wrap_method(channel, level, direction, delay)
@@ -68,4 +74,4 @@ class DRSDevice(HWClientInstance):
 
     @add_serverclass_doc(drs_methods.DRSDevice)
     def is_ready(self) -> bool:
-        return self.is_ready()
+        return self._wrap_method()
