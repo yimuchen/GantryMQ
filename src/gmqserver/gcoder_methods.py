@@ -116,7 +116,7 @@ class GCoderDevice(HWBaseInstance):
 
     def send_home(self, x: bool, y: bool, z: bool) -> None:
         """Moving individual axis back to home positions"""
-        return self.send_home(x, y, z)
+        return self.device.send_home(x, y, z)
 
     def enable_stepper(self, x: bool, y: bool, z: bool) -> None:
         """Enabling the stepper motors for each axis"""
