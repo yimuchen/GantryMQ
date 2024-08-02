@@ -68,7 +68,7 @@ class DRSDevice(HWBaseInstance):
         Collecting a buffer given the current trigger settings. Notice this
         will not return the data buffer, use `get_samples` for that.
         """
-        return self.device.start_collection()
+        return self.device.start_collect()
 
     def force_stop(self):
         """Stopping the currenct data collection routine"""

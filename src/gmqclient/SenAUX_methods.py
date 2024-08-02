@@ -31,11 +31,11 @@ class SenAUXDevice(HWClientInstance):
 
     @add_serverclass_doc(SenAUXServer)
     def pulse_f1(self, n: int, w: int):
-        return self._wrap_method()
+        return self._wrap_method(n, w)
 
     @add_serverclass_doc(SenAUXServer)
     def pulse_f2(self, n: int, w: int):
-        return self._wrap_method()
+        return self._wrap_method(n, w)
 
     # Thinly wrapped Telemetry methods
     @add_serverclass_doc(SenAUXServer)
