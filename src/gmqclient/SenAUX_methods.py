@@ -31,10 +31,14 @@ class SenAUXDevice(HWClientInstance):
 
     @add_serverclass_doc(SenAUXServer)
     def pulse_f1(self, n: int, w: int):
+        """Adding hard count limit to avoid client/serve desync"""
+        assert n <= 10_000, "Do not set pulse count larger than 10K"
         return self._wrap_method(n, w)
 
     @add_serverclass_doc(SenAUXServer)
     def pulse_f2(self, n: int, w: int):
+        """Adding hard count limit to avoid client/serve desync"""
+        assert n <= 10_000, "Do not set pulse count larger than 10K"
         return self._wrap_method(n, w)
 
     # Thinly wrapped Telemetry methods
