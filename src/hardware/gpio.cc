@@ -1,92 +1,102 @@
-#include "sysfs.hpp"
 #include "threadsleep.hpp"
 
 #include <fmt/core.h>
+#include <gpiod.h> // New interface for working with GPIO
+#include <stdio.h>
+#include <string>
+#include <unistd.h>
 
 // Pybind11
 #include <pybind11/pybind11.h>
 
-/**
- * @brief Wrapper for a working with the GPIO pins.
+/** @brief Wrapper for a working with the GPIO pins.
  *
- * @details GPIO must be defined via a BCM pin index, which is different from
- * the physical bin layout. You can find the pin mapping using the wiringPi's
- * `gpio readall` command.
+ * @details Wee are using GPIO as simple digital toggles, so all GPIO devices
+ * will be defined as output devices. Because now chips/lines number always be
+ * created in pairs, each write request will attempt to reopen the devices in
+ * question. The example code is taken from repository:
+ * https://github.com/starnight/libgpiod-example
  */
-class gpio : private hw::fd_accessor
+class gpio
 {
 private:
-  uint8_t _pin_idx;
+  uint8_t            _pin_idx; // We only need to keep track of the line number
+  struct gpiod_chip* _chip_ptr;
+  struct gpiod_line* _line_ptr;
 
 public:
-  gpio( const uint8_t pin_idx, const int direction );
+  gpio( const uint8_t pin_idx );
   gpio( const gpio& )  = delete;
   gpio( const gpio&& ) = delete;
   ~gpio();
 
-  // Overloading the simple interactions
-  void slow_write( const bool ) const;
-  bool slow_read() const;
+  // Simple High/low toggle for a GPIO line
+  void write( const bool );
+  // Fast pulsing result
+  void pulse( const unsigned n, const unsigned wait );
 
-  void pulse( const unsigned n, const unsigned wait ) const;
+private:
+  const std::string _consume_str;
 
-  // Static flags for helping with settings
-  static constexpr int READ       = O_RDONLY;
-  static constexpr int WRITE      = O_WRONLY;
-  static constexpr int READ_WRITE = O_RDWR;
-
-  static std::string make_device_name( const uint8_t pin_idx, const int direction );
+  void prepare();
+  void release();
 };
 
 /**
- * @brief Opening the GPIO file descriptor for interacting with the GPIO pin of
- * interest.
- *
- * @details The user will need to specify the BCM pin index and the read/write
- * direction. As there are additional routines required to have the GPIO file
- * descriptors to be enabled in the system, those routines are define in the
- * make_device_name method. If this pre-routine fails, a exception will be
- * raised, and the primary file descriptor will never be initialized.
+ * @brief Logging the line number of interest
  */
-gpio::gpio( const uint8_t pin_idx, const int direction )
-  : //
-  hw::fd_accessor( gpio::make_device_name( pin_idx, direction ),
-                   fmt::format( "/sys/class/gpio/gpio{0:d}/value", pin_idx ), //
-                   direction )
-  , _pin_idx( pin_idx )
+gpio::gpio( const uint8_t pin_idx )
+  : _pin_idx( pin_idx )
+  , _chip_ptr( nullptr )
+  , _line_ptr( nullptr )
+  , _consume_str( fmt::format( "cons_gpio_{0:d}", _pin_idx ) )
 {
 }
 
-/**
- * @brief Static method of enabling a pin to be used.
- */
-std::string
-gpio::make_device_name( const uint8_t pin_idx, const int direction )
-{
-  // Enabling pin
-  hw::fd_accessor( "GPIO_export", "/sys/class/gpio/export", hw::fd_accessor::MODE::WRITE_ONLY )
-    .write( fmt::format( "{0:d}", pin_idx ) );
-  hw::sleep_milliseconds( 100 );
-
-  // Getting the direction path
-  const std::string dir_path = fmt::format( "/sys/class/gpio/gpio{0:d}/direction", pin_idx );
-
-  hw::fd_accessor::wait_fd_access( dir_path );
-  hw::sleep_milliseconds( 100 );
-  hw::fd_accessor( "GPIO_dir", dir_path, hw::fd_accessor::MODE::READ_WRITE )
-    .write( ( direction == gpio::READ ) ? "in" : "out" );
-
-  return fmt::format( "GPIO_{0:d}", pin_idx );
-}
-
-/**
- * @brief Additional routine needs to deallocate the the system resources of the
- * GPIO pin.
- */
 gpio::~gpio()
 {
-  hw::fd_accessor( "GPIO_unexport", "/sys/class/gpio/unexport", hw::fd_accessor::MODE::WRITE_ONLY )
-    .write( fmt::format( "{0:d}", this->_pin_idx ) );
+  release();
+}
+
+/**
+ *  @brief preparing the various devices for writing
+ */
+void
+gpio::prepare()
+{
+  _chip_ptr = gpiod_chip_open_by_name( "gpiochip0" );
+  if( !_chip_ptr ) {
+    perror( "Open chip failed\n" );
+    release();
+  }
+
+  _line_ptr = gpiod_chip_get_line( _chip_ptr, _pin_idx );
+  if( !_line_ptr ) {
+    perror( "Get line failed\n" );
+    release();
+  }
+
+  const int ret = gpiod_line_request_output( _line_ptr, _consume_str.c_str(), 0 );
+  if( ret < 0 ) {
+    perror( "Request line as output failed\n" );
+    release();
+  }
+}
+
+/**
+ * @brief Releasing the interface pointer
+ **/
+void
+gpio::release()
+{
+  if( _line_ptr ) {
+    gpiod_line_release( _line_ptr );
+    _line_ptr = nullptr;
+  }
+  if( _chip_ptr ) {
+    gpiod_chip_close( _chip_ptr );
+    _chip_ptr = nullptr;
+  }
 }
 
 /**
@@ -94,19 +104,16 @@ gpio::~gpio()
  * checks. And raises exception checks fail.
  */
 void
-gpio::slow_write( const bool x ) const
+gpio::write( const bool x )
 {
-  this->write( x ? "1" : "0" );
-}
-
-/**
- * @brief Slow read operation to check for current voltage value. Run all
- * typical read checks and raises exception if checks fail.
- */
-bool
-gpio::slow_read() const
-{
-  return this->read_str() == "1";
+  prepare();
+  if( _line_ptr ) {
+    const int ret = gpiod_line_set_value( _line_ptr, x );
+    if( ret < 0 ) {
+      perror( "Set line output failed\n" );
+    }
+  }
+  release();
 }
 
 /**
@@ -117,30 +124,23 @@ gpio::slow_read() const
  * down time. The fastest pulse rate is about 100 microseconds.
  */
 void
-gpio::pulse( const unsigned n, const unsigned wait ) const
+gpio::pulse( const unsigned n, const unsigned wait )
 {
-  check_valid();
+  prepare();
   for( unsigned i = 0; i < n; ++i ) {
-    this->write_raw( "1", 1 );
-    hw::sleep_nanoseconds( 500 );
-    this->write_raw( "0", 1 );
+    const int ret1 = gpiod_line_set_value( _line_ptr, 1 );
+    hw::sleep_nanoseconds( 5 );
+    const int ret2 = gpiod_line_set_value( _line_ptr, 0 );
     hw::sleep_microseconds( wait );
   }
+  release();
 }
 
 PYBIND11_MODULE( gpio, m )
 {
   pybind11::class_<gpio>( m, "gpio" )
-    .def( pybind11::init<const uint8_t, const int>() )
-
+    .def( pybind11::init<const uint8_t>() )
     // Command-like function calls
-    .def( "slow_write", &gpio::slow_write )
-    .def( "pulse", &gpio::pulse, pybind11::arg( "n" ), pybind11::arg( "wait" ) )
-
-    // Read-only function calls.
-    .def( "slow_read", &gpio::slow_read )
-
-    .def_readonly_static( "READ", &gpio::READ )
-    .def_readonly_static( "WRITE", &gpio::WRITE )
-    .def_readonly_static( "READ_WRITE", &gpio::READ_WRITE );
+    .def( "write", &gpio::write )
+    .def( "pulse", &gpio::pulse, pybind11::arg( "n" ), pybind11::arg( "wait" ) );
 }

@@ -46,7 +46,7 @@ target_link_libraries(hwsysfs PRIVATE ${PYTHON_LIBRARIES})
 ## Libraries are supposed to be python modules
 function(make_hardware_library libname)
   pybind11_add_module(${libname} SHARED ${ARGN})
-  target_link_libraries(${libname} PRIVATE fmt::fmt hwsysfs)
+  target_link_libraries(${libname} PRIVATE fmt::fmt hwsysfs gpiod)
 endfunction()
 
 
