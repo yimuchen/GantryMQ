@@ -5,6 +5,8 @@ from zmq_server import make_cmd_parser
 
 # Template for what will be going into the
 template = """
+[Unit]
+Description=Starting the gantry/periphary control message servers
 WantedBy=default.target
 
 [Service]
@@ -12,9 +14,6 @@ WorkingDirectory={base_dir}
 ExecStart=python run_server.py {config_path}
 StandardError=journal
 StandardOutput=journal
-
-[Unit]
-Description=Starting the gantry/periphary control message servers
 """
 
 
