@@ -84,10 +84,13 @@ class HVLVDevice(HWBaseInstance):
         )
 
         if not set_dummy:
-            self.hv_gpio = gpio(int(dev_conf["HV_ENABLE_GPIO"]), gpio.READ_WRITE)
+            self.hv_gpio = gpio(int(dev_conf["HV_ENABLE_GPIO"]))
             self.hvlv_adc = i2c_ads1115(1, int(dev_conf["HVLV_ADC_ADDR"], base=16))
             self.hv_dac = i2c_mcp4725(1, int(dev_conf["HV_DAC_ADDR"], base=16))
             self.lv_dac = i2c_mcp4725(1, int(dev_conf["LV_DAC_ADDR"], base=16))
+
+            # Disable HV on start up
+            self.hv_gpio.write(0)
         else:
             self.hv_gpio = None
             self.hvlv_adc = None
@@ -97,14 +100,14 @@ class HVLVDevice(HWBaseInstance):
     def hv_enable(self):
         """Enable the high-voltage power rail"""
         if not self.is_dummy():
-            self.hv_gpio.slow_write(True)
+            self.hv_gpio.write(True)
         else:
             self.hv_gpio = True
 
     def hv_disable(self):
         """Disable the high-voltage power rail"""
         if not self.is_dummy():
-            self.hv_gpio.slow_write(False)
+            self.hv_gpio.write(False)
         else:
             self.hv_gpio = False
 
@@ -141,7 +144,7 @@ class HVLVDevice(HWBaseInstance):
     def get_hv_mv(self) -> float:
         """Returning the high-voltage rail voltage value. Units in mV"""
         if not self.is_dummy():
-            # TODO: 101 from multiple divider values. programmable??
+            # TODO: 101 from multiple divider values. Programmable??
             return self.hvlv_adc.read_mv(0, i2c_ads1115.ADS_RANGE_1V) * 101
         else:
             if self.get_hv_status():
