@@ -2,6 +2,7 @@
 
 #include <fmt/core.h>
 #include <gpiod.h> // New interface for working with GPIO
+#include <stdexcept>
 #include <stdio.h>
 #include <string>
 #include <unistd.h>
@@ -32,6 +33,7 @@ public:
 
   // Simple High/low toggle for a GPIO line
   void write( const bool );
+  bool read();
   // Fast pulsing result
   void pulse( const unsigned n, const unsigned wait );
 
@@ -101,36 +103,63 @@ gpio::release()
 
 /**
  * @brief Slow write operation to toggle the pin value. Run all typically write
- * checks. And raises exception checks fail.
+ * checks. Raises exception if checks fail.
  */
 void
 gpio::write( const bool x )
 {
   prepare();
-  if( _line_ptr ) {
-    const int ret = gpiod_line_set_value( _line_ptr, x );
-    if( ret < 0 ) {
-      perror( "Set line output failed\n" );
-    }
+  if( !_line_ptr ) {
+    release();
+    throw std::runtime_error( "Failed to setup file descriptors" );
   }
+  const int ret = gpiod_line_set_value( _line_ptr, x );
   release();
+  if( ret < 0 ) {
+    throw std::runtime_error( "Failed to write to file descriptor" );
+  }
+  return;
+}
+
+/**
+ * @Slow read operation to check the logical value of GPIO.
+ */
+bool
+gpio::read()
+{
+  prepare();
+  if( !_line_ptr ) {
+    release();
+    throw std::runtime_error( "Failed to setup file descriptors" );
+  }
+  const int ret = gpiod_line_get_value( _line_ptr );
+  release();
+  if( ret < 0 ) {
+    throw std::runtime_error( "Failed to read from file descriptor" );
+  }
+  return ret;
 }
 
 /**
  * @brief Generating N pulses with some time in between pulses. Only 1 validity
  * check will performed at the start of the function call.
  *
- * All pulses will have a high-time of 1 microsecond, and a w microsecond of
+ * All pulses will have a high-time of 5 nanoseconds, and a w microsecond of
  * down time. The fastest pulse rate is about 100 microseconds.
  */
 void
 gpio::pulse( const unsigned n, const unsigned wait )
 {
   prepare();
+  if( !_line_ptr ) {
+    release();
+    throw std::runtime_error( "Failed to setup file descriptors" );
+    return;
+  }
   for( unsigned i = 0; i < n; ++i ) {
-    const int ret1 = gpiod_line_set_value( _line_ptr, 1 );
+    gpiod_line_set_value( _line_ptr, 1 );
     hw::sleep_nanoseconds( 5 );
-    const int ret2 = gpiod_line_set_value( _line_ptr, 0 );
+    gpiod_line_set_value( _line_ptr, 0 );
     hw::sleep_microseconds( wait );
   }
   release();
@@ -142,5 +171,6 @@ PYBIND11_MODULE( gpio, m )
     .def( pybind11::init<const uint8_t>() )
     // Command-like function calls
     .def( "write", &gpio::write )
+    .def( "read", &gpio::read )
     .def( "pulse", &gpio::pulse, pybind11::arg( "n" ), pybind11::arg( "wait" ) );
 }
