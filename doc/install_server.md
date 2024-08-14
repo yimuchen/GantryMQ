@@ -6,7 +6,7 @@ building the image from scratch using the standard tools.
 
 ## Preparing the base image
 
-The base image for the Raspberry Pi OS can be found \[here\]\[rpios\], just follow
+The base image for the Raspberry Pi OS can be found [here][rpios], just follow
 the main instructions here. Notice that this instruction assumes that you are
 using a Raspberry Pi 4.
 
@@ -34,49 +34,38 @@ before one can get the networking setup.
 
 ## Setting up device permissions
 
-Modify the `/boot/config.txt` file so that I2C interfaces are available. Be sure
-to add the following lines to the _after_ the kernel loading line:
+Once log onto the device, run the command `sudo raspi-config` and in the
+"Interfaces options" section, enable the SSH, I2C interfaces. This
+automatically sets up the permission on the RPi allow for I2C interface handling.
 
-```bash
-dtparam=i2c_arm=on
-```
-
-Next, we create new permission groups to avoid running the master program as
-root. If you are testing this program on your personal machine, do **not** add
-yourself to the `gpio` and `i2c` groups, as these devices are typically reserved
-for temperature monitor and control system on typical computer laptop. Randomly
-changing `i2c` and `gpio` value **will** damage your device.
+Additionally, to use the DRS device as a non-root users, you will need to set
+yourself up to a custom group. The permissions for setting up the system to 
+recognize the devices will be described latter.
 
 ```bash
 groupadd -f -r drs
 usermod -a -G drs ${USER}
-## DO NOT ADD!! unless you are sure of what you are doing!
-## This will allow your user to use hardware pins, and should not be used on personal machines!!
-# groupadd -f -r gpio
-# usermod -a -G gpio ${USER}
-# groupadd -f -r i2c
-# usermod -a -G i2c ${USER}
 ```
 
 Reboot the Raspberry Pi board to have everything take effect.
 
-## Installing common C++ dependencies
+## Installing common C++/Python dependencies
 
 All C++ related dependencies are available in the Raspberry Pi/Ubuntu
-repository. Run the following `apt-get` commands to make sure all commands are
+repository. Run the following `apt` commands to make sure all commands are
 available.
 
 ```bash
 # Update repository information
-sudo apt-get update
+sudo apt update
 # For compiling the C/C++ libraries and python bindings
-sudo apt-get install git cmake python3-pybind11 pybind11-dev libfmt-dev
+sudo aptinstall git cmake python3-pybind11 pybind11-dev libfmt-dev libgpiod-dev
 # For compiling the DRS software
-sudo apt-get install libwxgtk3.2-dev libusb-dev libusb-1.0-0-dev
+sudo apt install libwxgtk3.2-dev libusb-dev libusb-1.0-0-dev
 # For python requirements
-sudo apt-get install python3-zmq python3-opencv python3-scipy python3-pyvisa
+sudo apt install python3-zmq python3-opencv python3-scipy python3-pyvisa
 # Additional tools that can help with operations and configuration
-sudo apt-get install jq
+sudo apt install jq
 ```
 
 ## Installing and compiling the server software
@@ -94,11 +83,7 @@ cmake --build ./
 Also, copy the custom `udev` rules to expose device IDs to the various groups.
 
 ```bash
-cp gantrymq.service  $HOME/.config/systemd/user/gantrymq.service
-
 cp external/rules/drs.rules   /etc/udev/rules.d/
-## DO NOT ADD unless you are sure of what you are doing!!
-# cp external/rules/digi.rules  /etc/udev/rules.d/
 ```
 
 You will need to reboot for the all changes to take effect.
@@ -108,3 +93,5 @@ knowledge of how the various hardware is connected. For the continued
 documentation of how to properly configure the software according to the
 hardware configuration, see the file ["server-side
 configuration"](./config_server.md).
+
+[rpios]: https://www.raspberrypi.com/software/

@@ -17,10 +17,10 @@ Program will then close nominally.
 )
 
 ## Testing the GPIO -- A trigger-like pin on GPIO pin 21 (physical pin 40)
-trigger_gpio = gpio(21, gpio.WRITE)
-trigger_gpio.pulse(100, 1000)
+trigger_gpio = gpio(21)
+trigger_gpio.pulse(1000, 1000)
 
-hv_gpio = gpio(27, gpio.WRITE)
-hv_gpio.slow_write(True)
+hv_gpio = gpio(27)
+hv_gpio.write(True)
 time.sleep(5)
-hv_gpio.slow_write(False)
+hv_gpio.write(False)

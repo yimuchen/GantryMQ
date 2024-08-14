@@ -45,13 +45,16 @@ class RigolPS(HWBaseInstance):
         """Connecting the"""
         rm = pyvisa.ResourceManager("@py")
         for res_str in rm.list_resources():
-            _iface, _vid, _pid, _serial, _idx, _man = res_str.split("::")
-            if self.serial in _serial:
-                self.device = rm.open_resource(res_str)
-                self.vid = int(_vid, 10)
-                self.pid = int(_pid, 10)
-                time.sleep(0.1)
-                break
+            try:
+                _iface, _vid, _pid, _serial, _idx, _man = res_str.split("::")
+                if self.serial in _serial:
+                    self.device = rm.open_resource(res_str)
+                    self.vid = int(_vid, 10)
+                    self.pid = int(_pid, 10)
+                    time.sleep(0.1)
+                    break
+            except Exception: # Ignore errors here
+                pass
         if self.device is None:
             raise RuntimeError("Error, valid VISA address not found")
 

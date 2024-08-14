@@ -38,7 +38,11 @@ The following instructions concern the use of [this board][hvlvboard]. Before
 using the board, you will need to check:
 
 - The GPIO pin used for HV switching. This can **not** be checked in software,
-  and can only be checked by looking at the jumper configuration.
+  and can only be checked by looking at the jumper configuration. Also notice
+  that the GPIO pin numbers correspond to GPIO logic numbers, not the physical
+  pin number on the 40-pin connector. Consult the official documentation to see
+  the mapping:
+  https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#gpio
 - I2C address pin of the ADC. The pin configuration used would indicate the
   last bit of the address, and you can add the bit value to the `0b1001000`
   (`0x48`) prefix of the [`ads1115`][ads1115].

@@ -65,9 +65,9 @@ class SenAUXDevice(HWClientInstance):
         the bias resistor configurations. Units in Ohm.
         """
         assert 1 <= channel <= 3
-        vdd = self.senaux_adc_readmv(0)
-        vt = self.senaux_adc_readmv(channel)
-        r1, r2 = self.senaux_adc_biasresistor(channel)
+        vdd = self.adc_readmv(0)
+        vt = self.adc_readmv(channel)
+        r1, r2 = self.adc_biasresistor(channel)
         # Voltage divider configuration:
         # vt = vdd * (R + R2) / (R + R1+R2)
         return (vt * (r1 + r2) - vdd * r2) / (vdd - vt)

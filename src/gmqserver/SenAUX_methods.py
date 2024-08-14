@@ -33,7 +33,7 @@ class SenAUXDevice(HWBaseInstance):
         return True
 
     def is_dummy(self):
-        return isinstance(self.f1_gpio, gpio)
+        return not isinstance(self.f1_gpio, gpio)
 
     def reset_devices(self, device_json: Dict[str, Any]):
         """
@@ -107,22 +107,25 @@ class SenAUXDevice(HWBaseInstance):
             self.f2_gpio = None
             self.sen_adc = None
         else:
-            self.pd1_gpio = gpio(int(device_json["SENAUX_PD1_GPIO"]), gpio.READ_WRITE)
-            self.pd2_gpio = gpio(int(device_json["SENAUX_PD2_GPIO"]), gpio.READ_WRITE)
-            self.f1_gpio = gpio(int(device_json["SENAUX_F1_GPIO"]), gpio.READ_WRITE)
-            self.f2_gpio = gpio(int(device_json["SENAUX_F2_GPIO"]), gpio.READ_WRITE)
+            self.pd1_gpio = gpio(int(device_json["SENAUX_PD1_GPIO"]))
+            self.pd2_gpio = gpio(int(device_json["SENAUX_PD2_GPIO"]))
+            self.f1_gpio = gpio(int(device_json["SENAUX_F1_GPIO"]))
+            self.f2_gpio = gpio(int(device_json["SENAUX_F2_GPIO"]))
             self.sen_adc = i2c_ads1115(
                 1, int(device_json["SENAUX_ADC"]["ADDR"], base=16)
             )
             self.resdiv_1 = tuple(device_json["SENAUX_ADC"]["C1"])
             self.resdiv_2 = tuple(device_json["SENAUX_ADC"]["C2"])
             self.resdiv_3 = tuple(device_json["SENAUX_ADC"]["C3"])
+            # Disable power delivery on start up
+            self.pd1_gpio.write(0)
+            self.pd2_gpio.write(0)
 
     @classmethod
     def _write_gpio(cls, dev: Union[bool, gpio], val: bool):
         """Helper method for dummy device processing"""
         if isinstance(dev, gpio):
-            dev.slow_write(val)
+            dev.write(val)
         else:
             dev = val
 
